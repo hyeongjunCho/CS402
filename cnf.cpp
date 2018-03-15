@@ -170,6 +170,29 @@ string CnfTree::get_infix(TreeNode* root) {
     }
 }
 
+void CnfTree::implFree() {
+    root = implFree(root);
+}
+
+TreeNode* CnfTree::implFree(TreeNode* root) {
+    if (root->valueType == 0) {
+        return root;
+    } else if (root->value == ">") {
+        root->value = "|";
+        TreeNode* leftNode = new TreeNode("-");
+        leftNode->valueType = 1;
+        leftNode->left = implFree(root->left);
+        root->left = leftNode;
+        root->right = implFree(root->right);
+    } else if (root->value == "-") {
+        root->left = implFree(root->left);
+    } else {
+        root->left = implFree(root->left);
+        root->right = implFree(root->right);
+    }
+    return root;
+}
+
 int main(int argc, char** argv) {
     if (argc != 2) {
         cout << "error... ./cnf <filename>" << endl;
@@ -181,10 +204,14 @@ int main(int argc, char** argv) {
     ifstream inf(filename.c_str());
     getline(inf, str);
 
-    cout << str << endl;
-
     CnfTree* tree = new CnfTree();
     tree->make_tree(str);
+    cout << tree->get_prefix() << endl;
+    cout << tree->get_infix() << endl;
+    cout << tree->get_postfix() << endl;
+
+    tree->implFree();
+
     cout << tree->get_prefix() << endl;
     cout << tree->get_infix() << endl;
     cout << tree->get_postfix() << endl;
