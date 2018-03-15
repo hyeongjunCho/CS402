@@ -27,7 +27,6 @@ class CnfTree
         void implFree();
         void NNF();
         void CNF();
-        void distr();
     private:
         stack<TreeNode**> op_stack; // Not stack of TreeNode list
         string get_prefix(TreeNode* root);
