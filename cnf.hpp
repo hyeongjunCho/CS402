@@ -25,7 +25,7 @@ class CnfTree
         string get_postfix();
         string get_infix();
     private:
-        stack<TreeNode**> op_stack;
+        stack<TreeNode**> op_stack; // Not stack of TreeNode list
         string get_prefix(TreeNode* root);
         string get_postfix(TreeNode* root);
         string get_infix(TreeNode* root);
