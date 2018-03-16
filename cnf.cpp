@@ -3,6 +3,8 @@
 #include <vector>
 #include <algorithm>
 #include <cstdlib>
+#include <typeinfo>
+#include <string>
 #include "cnf.hpp"
 using namespace std;
 
@@ -213,6 +215,11 @@ string CnfTree::get_minisat_form(TreeNode* node) {
     }
     
     if (node->valueType == 0) {
+        if (!node->value.empty() && find_if(node->value.begin(),
+        node->value.end(),
+        [](char c) { return !std::isdigit(c); }) == node->value.end()) {
+            return *find(begin(literals), end(literals), node->value);
+        }
         return to_string(distance(begin(literals), find(begin(literals), end(literals), node->value)) + 1);
     } else if (node->valueType == 1) {
         return node->value + a;
