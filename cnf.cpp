@@ -22,6 +22,7 @@ vector<string> split(const string& str, int delimiter(int) = ::isspace) {
 
 TreeNode::TreeNode(const string val) {
     value = val;
+    parent = NULL;
     left = NULL;
     right = NULL;
     if (val == "-") {
@@ -48,7 +49,6 @@ void CnfTree::clean(TreeNode* root) {
 
 void CnfTree::make_tree(const string expr) {
     vector<string> vals = split(expr);
-    
     for (auto s:vals) {
         if (s[0] == '&' || s[0] == '|' || s[0] == '>' || s[0] == '<' || s[0] == '=') {
             // binary operator
@@ -56,6 +56,7 @@ void CnfTree::make_tree(const string expr) {
             if (op_stack.empty()) {
                 root = op;
             } else {
+                op->parent = *op_stack.top();
                 *op_stack.top() = op;
                 op_stack.pop();
             }
@@ -67,6 +68,7 @@ void CnfTree::make_tree(const string expr) {
             if (op_stack.empty()) {
                 root = op;
             } else {
+                op->parent = *op_stack.top();
                 *op_stack.top() = op;
                 op_stack.pop();
             }
@@ -77,42 +79,50 @@ void CnfTree::make_tree(const string expr) {
             if (op_stack.empty()) {
                 root = l;
             } else {
+                l->parent = *op_stack.top();
                 *op_stack.top() = l;
                 op_stack.pop();
+                if (!(find(begin(literals), end(literals), l->value) != end(literals))) {
+                    literals.push_back(l->value);
+                }
             }
         }
     }
+}
+
+vector<string> CnfTree::get_literals() {
+    return literals;
 }
 
 string CnfTree::get_prefix() {
     return get_prefix(root);
 }
 
-string CnfTree::get_prefix(TreeNode* root) {
-    if (root == nullptr) return "";
+string CnfTree::get_prefix(TreeNode* node) {
+    if (node == nullptr) return "";
     string a, b;
     
-    if (root->left) {
-        if (root->valueType == 2) {
-            a = get_prefix(root->left) + " ";
+    if (node->left) {
+        if (node->valueType == 2) {
+            a = get_prefix(node->left) + " ";
         } else {
-            a = get_prefix(root->left);
+            a = get_prefix(node->left);
         }
     } else {
         a = "";
     }
 
-    if (root->right) {
-        b = get_prefix(root->right);
+    if (node->right) {
+        b = get_prefix(node->right);
     } else {
         b = "";
     }
-    if (root->valueType == 0) {
-        return root->value;
-    } else if (root->valueType == 1) {
-        return root->value + " " + a;
+    if (node->valueType == 0) {
+        return node->value;
+    } else if (node->valueType == 1) {
+        return node->value + " " + a;
     } else {
-        return root->value + " " + a + b;
+        return node->value + " " + a + b;
     }
 }
 
@@ -120,54 +130,97 @@ string CnfTree::get_postfix() {
     return get_postfix(root);
 }
 
-string CnfTree::get_postfix(TreeNode* root) {
-    if (root == nullptr) return "";
+string CnfTree::get_postfix(TreeNode* node) {
+    if (node == nullptr) return "";
     string a, b;
     
-    if (root->left) {
-        a = get_postfix(root->left) + " ";
+    if (node->left) {
+        a = get_postfix(node->left) + " ";
     } else {
         a = "";
     }
 
-    if (root->right) {
-        b = get_postfix(root->right) + " ";
+    if (node->right) {
+        b = get_postfix(node->right) + " ";
     } else {
         b = "";
     }
-    return a + b + root->value;
+    return a + b + node->value;
 }
 
 string CnfTree::get_infix() {
     return get_infix(root);
 }
 
-string CnfTree::get_infix(TreeNode* root) {
-    if (root == nullptr) return "";
+string CnfTree::get_infix(TreeNode* node) {
+    if (node == nullptr) return "";
     string a, b;
     
-    if (root->left) {
-        if (root->valueType == 2) {
-            a = get_infix(root->left) + " ";
+    if (node->left) {
+        if (node->valueType == 2) {
+            a = get_infix(node->left) + " ";
         } else {
-            a = get_infix(root->left);
+            a = get_infix(node->left);
         }
     } else {
         a = "";
     }
 
-    if (root->right) {
-        b = get_infix(root->right);
+    if (node->right) {
+        b = get_infix(node->right);
     } else {
         b = "";
     }
     
-    if (root->valueType == 0) {
-        return root->value;
-    } else if (root->valueType == 1) {
-        return root->value + " " + a;
+    if (node->valueType == 0) {
+        return node->value;
+    } else if (node->valueType == 1) {
+        return node->value + " " + a;
     } else {
-        return "(" + a + root->value + " " + b + ")";
+        if ((node->parent && node->parent->value == node->value && node->value == "&") ||
+        (node->parent && node->parent->value == node->value && node->value == "|") ||
+        node == root) {
+            return a + node->value + " " + b;
+        }
+        return "(" + a + node->value + " " + b + ")";
+    }
+}
+
+string CnfTree::get_minisat_form() {
+    CNF_clauses = 0;
+    string expression = get_minisat_form(root);
+    if (expression != "") {
+        CNF_clauses += 1;
+    }
+    expression += " 0";
+    return "p cnf " + to_string(literals.size()) + " " + to_string(CNF_clauses) + "\n" + expression;
+}
+
+string CnfTree::get_minisat_form(TreeNode* node) {
+    if (node == nullptr) return "";
+    string a, b;
+    
+    if (node->left) {
+        a = get_minisat_form(node->left);
+    } else {
+        a = "";
+    }
+
+    if (node->right) {
+        b = get_minisat_form(node->right);
+    } else {
+        b = "";
+    }
+    
+    if (node->valueType == 0) {
+        return to_string(distance(begin(literals), find(begin(literals), end(literals), node->value)) + 1);
+    } else if (node->valueType == 1) {
+        return node->value + a;
+    } else if (node->value == "&") {
+        CNF_clauses += 1;
+        return a + " 0" + "\n" + b;
+    } else {
+        return a + " " + b;
     }
 }
 
@@ -175,78 +228,95 @@ void CnfTree::implFree() {
     root = implFree(root);
 }
 
-TreeNode* CnfTree::implFree(TreeNode* root) {
-    if (root->valueType == 0) {
-        return root;
-    } else if (root->value == ">") {
-        root->value = "|";
-        root->valueType = 2;
+TreeNode* CnfTree::implFree(TreeNode* node) {
+    if (node->valueType == 0) {
+        return node;
+    } else if (node->value == ">") {
+        node->value = "|";
+        node->valueType = 2;
         TreeNode* leftNode = new TreeNode("-");
-        leftNode->left = implFree(root->left);
-        root->left = leftNode;
-        root->right = implFree(root->right);
-    } else if (root->value == "-") {
-        root->left = implFree(root->left);
+        leftNode->left = implFree(node->left);
+        node->left = leftNode;
+        node->right = implFree(node->right);
+        node->left->parent = node;
+        node->right->parent = node;
+    } else if (node->value == "-") {
+        node->left = implFree(node->left);
+        node->left->parent = node;
     } else {
-        root->left = implFree(root->left);
-        root->right = implFree(root->right);
+        node->left = implFree(node->left);
+        node->right = implFree(node->right);
+        node->left->parent = node;
+        node->right->parent = node;
     }
-    return root;
+    return node;
 }
 
 void CnfTree::NNF() {
     root = NNF(root);
 }
 
-TreeNode* CnfTree::NNF(TreeNode* root) {
-    if (root->valueType == 0 || (root->value == "-" && root->left->valueType == 0)) {
-        return root;
-    } else if (root->value == "-" && root->left->value == "-") {
-        root = NNF(root->left->left);
-    } else if (root->value == "&" || root->value == "|") {
-        root->left = NNF(root->left);
-        root->right = NNF(root->right);
-    } else if (root->value == "-" && root->left->value == "&") {
-        root->value = "|";
-        root->valueType = 2;
+TreeNode* CnfTree::NNF(TreeNode* node) {
+    if (node->valueType == 0 || (node->value == "-" && node->left->valueType == 0)) {
+        return node;
+    } else if (node->value == "-" && node->left->value == "-") {
+        TreeNode* temp = node->parent;
+        node = NNF(node->left->left);
+        node->parent = temp;
+    } else if (node->value == "&" || node->value == "|") {
+        node->left = NNF(node->left);
+        node->right = NNF(node->right);
+        node->left->parent = node;
+        node->right->parent = node;
+    } else if (node->value == "-" && node->left->value == "&") {
+        node->value = "|";
+        node->valueType = 2;
         TreeNode* leftNode = new TreeNode("-");
-        leftNode->left = root->left->left;
+        leftNode->left = node->left->left;
         TreeNode* rightNode = new TreeNode("-");
-        rightNode->left = root->left->right;
-        root->left = leftNode;
-        root->right = rightNode;
-        root = NNF(root);
-    } else if (root->value == "-" && root->left->value == "|") {
-        root->value = "&";
-        root->valueType = 2;
+        rightNode->left = node->left->right;
+        node->left = leftNode;
+        node->right = rightNode;
+        node->left->parent = node;
+        node->right->parent = node;
+        node = NNF(node);
+    } else if (node->value == "-" && node->left->value == "|") {
+        node->value = "&";
+        node->valueType = 2;
         TreeNode* leftNode = new TreeNode("-");
-        leftNode->left = root->left->left;
+        leftNode->left = node->left->left;
         TreeNode* rightNode = new TreeNode("-");
-        rightNode->left = root->left->right;
-        root->left = leftNode;
-        root->right = rightNode;
-        root = NNF(root);
+        rightNode->left = node->left->right;
+        node->left = leftNode;
+        node->right = rightNode;
+        node->left->parent = node;
+        node->right->parent = node;
+        node = NNF(node);
     }
-    return root;
+    return node;
 }
 
 void CnfTree::CNF() {
     root = CNF(root);
 }
 
-TreeNode* CnfTree::CNF(TreeNode* root) {
-    if (root->valueType == 0 || (root->value == "-" && root->left->valueType == 0)) {
-        return root;
-    } else if (root->value == "&") {
-        root->left = CNF(root->left);
-        root->right = CNF(root->right);
-    } else if (root->value == "|") {
-        TreeNode* d = distr(CNF(root->left), CNF(root->right));
-        root->value = d->value;
-        root->left = d->left;
-        root->right = d->right;
+TreeNode* CnfTree::CNF(TreeNode* node) {
+    if (node->valueType == 0 || (node->value == "-" && node->left->valueType == 0)) {
+        return node;
+    } else if (node->value == "&") {
+        node->left = CNF(node->left);
+        node->right = CNF(node->right);
+        node->left->parent = node;
+        node->right->parent = node;
+    } else if (node->value == "|") {
+        TreeNode* d = distr(CNF(node->left), CNF(node->right));
+        node->value = d->value;
+        node->left = d->left;
+        node->right = d->right;
+        node->left->parent = node;
+        node->right->parent = node;
     }
-    return root;
+    return node;
 }
 
 TreeNode* CnfTree::distr(TreeNode* node1, TreeNode* node2) {
@@ -257,16 +327,22 @@ TreeNode* CnfTree::distr(TreeNode* node1, TreeNode* node2) {
         TreeNode* rightNode = distr(node1->right, node2);
         temp->left = leftNode;
         temp->right = rightNode;
+        temp->left->parent = temp;
+        temp->right->parent = temp;
     } else if (node2->value == "&") {
         temp = new TreeNode("&");
         TreeNode* leftNode = distr(node1, node2->left);
         TreeNode* rightNode = distr(node1, node2->right);
         temp->left = leftNode;
         temp->right = rightNode;
+        temp->left->parent = temp;
+        temp->right->parent = temp;
     } else {
         temp = new TreeNode("|");
         temp->left = node1;
         temp->right = node2;
+        temp->left->parent = temp;
+        temp->right->parent = temp;
     }
     return temp;
 }
@@ -281,35 +357,64 @@ int main(int argc, char** argv) {
     string filename(argv[1]);
     ifstream inf(filename.c_str());
     getline(inf, str);
+    inf.close();
 
     CnfTree* tree = new CnfTree();
+    CnfTree* negationTree = new CnfTree();
 
     tree->make_tree(str);
-    
-    cout << tree->get_prefix() << endl;
-    cout << tree->get_infix() << endl;
-    cout << tree->get_postfix() << endl;
-    cout << endl;
+    negationTree->make_tree("- " + str);
+
+    // cout << tree->get_prefix() << endl;
+    // cout << tree->get_infix() << endl;
+    // cout << tree->get_postfix() << endl;
+    // cout << endl;
 
     tree->implFree();
 
-    cout << tree->get_prefix() << endl;
-    cout << tree->get_infix() << endl;
-    cout << tree->get_postfix() << endl;
-    cout << endl;
+    // cout << tree->get_prefix() << endl;
+    // cout << tree->get_infix() << endl;
+    // cout << tree->get_postfix() << endl;
+    // cout << endl;
 
     tree->NNF();
 
-    cout << tree->get_prefix() << endl;
-    cout << tree->get_infix() << endl;
-    cout << tree->get_postfix() << endl;
-    cout << endl;
+    // cout << tree->get_prefix() << endl;
+    // cout << tree->get_infix() << endl;
+    // cout << tree->get_postfix() << endl;
+    // cout << endl;
 
     tree->CNF();
 
     cout << tree->get_prefix() << endl;
     cout << tree->get_infix() << endl;
-    cout << tree->get_postfix() << endl;
+    // cout << tree->get_postfix() << endl;
+    // cout << endl;
+
+    negationTree->implFree();
+    negationTree->NNF();
+    negationTree->CNF();
+
+    // cout << negationTree->get_prefix() << endl;
+    // cout << negationTree->get_infix() << endl;
+    // cout << negationTree->get_postfix() << endl;
+    // cout << endl;
+
+    ofstream outf("negationMinisatForm.txt");
+    outf << negationTree->get_minisat_form();
+    outf.close();
+    std::system("./minisat negationMinisatForm.txt negationMinisatOut.txt > temptemptemp.temp");
+    std::system("rm temptemptemp.temp");
+
+
+    ifstream negation("negationMinisatOut.txt");
+    getline(negation, str);
+    negation.close();
+    if (str == "SAT") {
+        cout << "Not Valid" << endl;
+    } else {
+        cout << "Valid" << endl;
+    }
 
     return 0;
 }
