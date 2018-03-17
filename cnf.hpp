@@ -26,6 +26,7 @@ class CnfTree
         string get_postfix();
         string get_infix();
         string get_minisat_form();
+        int get_max_literal();
         void implFree();
         void NNF();
         void CNF();

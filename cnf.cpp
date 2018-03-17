@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <vector>
 #include <algorithm>
 #include <cstdlib>
@@ -94,6 +95,19 @@ void CnfTree::make_tree(const string expr) {
 
 vector<string> CnfTree::get_literals() {
     return literals;
+}
+
+int CnfTree::get_max_literal() {
+    if (literals[0].find_first_not_of( "0123456789" ) == string::npos) {
+        int max = 0;
+        for (auto str:literals) {
+            if (max < stoi(str)) {
+                max = stoi(str);
+            }
+        }
+        return max;
+    }
+    return get_literals().size();
 }
 
 string CnfTree::get_prefix() {
@@ -217,7 +231,7 @@ string CnfTree::get_minisat_form(TreeNode* node) {
     if (node->valueType == 0) {
         if (!node->value.empty() && find_if(node->value.begin(),
         node->value.end(),
-        [](char c) { return !std::isdigit(c); }) == node->value.end()) {
+        [](char c) { return !isdigit(c); }) == node->value.end()) {
             return *find(begin(literals), end(literals), node->value);
         }
         return to_string(distance(begin(literals), find(begin(literals), end(literals), node->value)) + 1);
@@ -286,7 +300,9 @@ TreeNode* CnfTree::NNF(TreeNode* node) {
         node->right = rightNode;
         node->left->parent = node;
         node->right->parent = node;
+        TreeNode* temp = node->parent;
         node = NNF(node);
+        node->parent = temp;
     } else if (node->value == "-" && node->left->value == "|") {
         node->value = "&";
         node->valueType = 2;
@@ -298,7 +314,9 @@ TreeNode* CnfTree::NNF(TreeNode* node) {
         node->right = rightNode;
         node->left->parent = node;
         node->right->parent = node;
+        TreeNode* temp = node->parent;
         node = NNF(node);
+        node->parent = temp;
     }
     return node;
 }
@@ -318,6 +336,7 @@ TreeNode* CnfTree::CNF(TreeNode* node) {
     } else if (node->value == "|") {
         TreeNode* d = distr(CNF(node->left), CNF(node->right));
         node->value = d->value;
+        node->valueType = d->valueType;
         node->left = d->left;
         node->right = d->right;
         node->left->parent = node;
@@ -393,35 +412,129 @@ int main(int argc, char** argv) {
 
     tree->CNF();
 
-    cout << tree->get_prefix() << endl;
-    cout << tree->get_infix() << endl;
+    // cout << tree->get_prefix() << endl;
+    // cout << tree->get_infix() << endl;
     // cout << tree->get_postfix() << endl;
     // cout << endl;
 
-    negationTree->implFree();
-    negationTree->NNF();
-    negationTree->CNF();
+    // negationTree->implFree();
+    // negationTree->NNF();
+    // negationTree->CNF();
 
     // cout << negationTree->get_prefix() << endl;
     // cout << negationTree->get_infix() << endl;
     // cout << negationTree->get_postfix() << endl;
     // cout << endl;
 
+    string minisat_form = tree->get_minisat_form();
+    vector<string> minisat_form_fixed_vector;
+    string minisat_form_fixed;
+    string splited;
+
+
+    auto e = minisat_form.end();
+    auto i = minisat_form.begin();
+    while (i != e) {
+        i = find_if_not(i, e, [](char c) {return c == '\n';});
+        if (i == e) break;
+        auto j = find_if(i, e, [](char c) {return c == '\n';});
+        splited = string(i,j);
+        i = j;
+        vector<string> splited_vector = split(splited);
+        if (splited.c_str()[0] != 'p') {
+            sort(splited_vector.begin(), --splited_vector.end());
+        }
+        splited_vector.erase(unique(splited_vector.begin(), splited_vector.end()), splited_vector.end());
+        splited = "";
+        for (auto str:splited_vector) {
+            splited = splited + str + " ";
+        }
+        splited = splited.substr(0, splited.length() - 1);
+        minisat_form_fixed_vector.push_back(splited);
+    }
+    sort(++minisat_form_fixed_vector.begin(), minisat_form_fixed_vector.end());
+    minisat_form_fixed_vector.erase(unique(minisat_form_fixed_vector.begin(), minisat_form_fixed_vector.end()), minisat_form_fixed_vector.end());
+    minisat_form_fixed_vector.erase(minisat_form_fixed_vector.begin());
+    vector<vector<string>::iterator> its;
+    for (auto it = minisat_form_fixed_vector.begin(); it != minisat_form_fixed_vector.end(); it++) {
+        string str = *it;
+        stringstream ss;
+        str.erase(remove(str.begin(), str.end(), '-'), str.end());
+        vector<string> temp = split(str);
+        sort(temp.begin(), --temp.end());
+        for(int i = 0; i < temp.size(); i++) {
+            ss << temp[i];
+            if (i != temp.size() - 1) {
+                ss << " ";
+            }
+        }
+        str = ss.str();
+        ss.str("");
+        temp.erase(unique(temp.begin(), temp.end()), temp.end());
+        for(int i = 0; i < temp.size(); i++) {
+            ss << temp[i];
+            if (i != temp.size() - 1) {
+                ss << " ";
+            }
+        }
+        if (str != ss.str()) {
+            its.push_back(it);
+        }
+    }
+    for (auto it = its.rbegin(); it != its.rend(); it++) {
+        minisat_form_fixed_vector.erase(*it);
+    }
+
+    vector<int> delete_lines;
+    for (int i = 0; i < minisat_form_fixed_vector.size(); i++) {
+        for (int j = 0; j < i; j++) {
+            vector<string> first = split(minisat_form_fixed_vector[i]);
+            vector<string> second = split(minisat_form_fixed_vector[j]);
+            int count = 0;
+            for (auto k:first) {
+                for (auto l:second) {
+                    if (k == l) {
+                        count++;
+                    }
+                }
+            }
+            if (count == first.size()) {
+                delete_lines.push_back(j);
+            } else if (count == second.size()) {
+                delete_lines.push_back(i);
+            }
+        }
+    }
+    sort(delete_lines.begin(), delete_lines.end());
+    delete_lines.erase(unique(delete_lines.begin(), delete_lines.end()), delete_lines.end());
+    
+    for (auto i = delete_lines.rbegin(); i != delete_lines.rend(); i++) {
+        minisat_form_fixed_vector.erase(minisat_form_fixed_vector.begin() + *i);
+    }
+
+    minisat_form_fixed_vector.insert(minisat_form_fixed_vector.begin(), "p cnf " + to_string(tree->get_max_literal()) + " " + to_string(minisat_form_fixed_vector.size()));
+    for (auto str:minisat_form_fixed_vector) {
+        minisat_form_fixed = minisat_form_fixed + str + "\n";
+    }
+
     ofstream outf("negationMinisatForm.txt");
-    outf << negationTree->get_minisat_form();
+    outf << minisat_form_fixed;
     outf.close();
+    std::system("rm negationMinisatOut.txt");
+    // std::system("./minisat negationMinisatForm.txt negationMinisatOut.txt");
     std::system("./minisat negationMinisatForm.txt negationMinisatOut.txt > temptemptemp.temp");
     std::system("rm temptemptemp.temp");
 
 
     ifstream negation("negationMinisatOut.txt");
     getline(negation, str);
+    cout << str << endl;
     negation.close();
-    if (str == "SAT") {
-        cout << "Not Valid" << endl;
-    } else {
-        cout << "Valid" << endl;
-    }
+    // if (str == "SAT") {
+    //     cout << "Not Valid" << endl;
+    // } else {
+    //     cout << "Valid" << endl;
+    // }
 
     return 0;
 }
