@@ -22,15 +22,15 @@ vector<int> split(const string& str, int delimiter(int) = ::isspace) {
     return result;
 }
 
-int factorial(int n) {
-    if (n == 1) {
+long long int factorial(int n) {
+    if (n == 1 || n == 0) {
         return 1;
     } else {
         return n * factorial(n - 1);
     }
 }
 
-int combinationRepeatedNum(int n, int m) {
+long long int combinationRepeatedNum(int n, int m) {
     return factorial(n + m - 1) / factorial(m) / factorial(n - 1);
 }
 
@@ -114,11 +114,12 @@ int main(int argc, char** argv) {
         }
         int* set = (int*)malloc(sizeof(int) * num_Xs);
         string Xs = "";
-        combinationRepeatedList(set, 0, num_space_available, num_Xs, 0, &Xs_list);
+        combinationRepeatedList(set, 0, num_space_available, num_Xs, 0, &Xs);
         Xs_list += Xs;
         Xs_vector_int.push_back(num_Xs);
     }
-    
+    Xs_list += "\n";
+
     auto e = Xs_list.end();
     auto i = Xs_list.begin();
     while (i != e) {
@@ -129,12 +130,13 @@ int main(int argc, char** argv) {
         i = j;
         Xs_vector_string.push_back(splited);
     }
+    cout << Xs_vector_string.size();
 
     for (int i = 0, j = 0; i < spaced_rows.size(); i++) {
         vector<int> row = spaced_rows[i];
         vector<string> lines;
         int base = i * columns.size();
-        for (int num = 0; num < combinationRepeatedNum(row.size() + 1, Xs_vector_int[i]); num++) {
+        for (long long int num = 0; num < combinationRepeatedNum(row.size() + 1, Xs_vector_int[i]); num++) {
             int current_cursor = 1 + base;
             string Xs = Xs_vector_string[j];
             for (int k = 0; k < row.size(); k++) {
@@ -214,15 +216,16 @@ int main(int argc, char** argv) {
             }
             j++;
         }
-        for (int j = 0; j < lines.size(); j++) {
-            if (j == 0) {
+        for (int k = 0; k < lines.size(); k++) {
+            if (k == 0) {
                 clauses.push_back("");
-                clauses[i] = lines[j];
+                clauses[i] = lines[k];
             } else {
-                clauses[i] = "| " + clauses[i] + " " + lines[j];
+                clauses[i] = "| " + clauses[i] + " " + lines[k];
             }
         }
     }
+    
     for (int i = 0; i < clauses.size(); i++) {
         if (i == 0) {
             formula_row = clauses[i];
@@ -236,18 +239,19 @@ int main(int argc, char** argv) {
     Xs_vector_int.clear();
     Xs_vector_string.clear();
 
-    for (auto row:spaced_columns) {
-        int num_space_available = row.size() + 1;
-        int num_Xs = columns.size();
-        for (auto i:row) {
+    for (auto column:spaced_columns) {
+        int num_space_available = column.size() + 1;
+        int num_Xs = rows.size();
+        for (auto i:column) {
             num_Xs -= i;
         }
         int* set = (int*)malloc(sizeof(int) * num_Xs);
         string Xs = "";
-        combinationRepeatedList(set, 0, num_space_available, num_Xs, 0, &Xs_list);
+        combinationRepeatedList(set, 0, num_space_available, num_Xs, 0, &Xs);
         Xs_list += Xs;
         Xs_vector_int.push_back(num_Xs);
     }
+    Xs_list += "\n";
     
     e = Xs_list.end();
     i = Xs_list.begin();
@@ -264,7 +268,7 @@ int main(int argc, char** argv) {
         vector<int> column = spaced_columns[i];
         vector<string> lines;
         int base = i;
-        for (int num = 0; num < combinationRepeatedNum(column.size() + 1, Xs_vector_int[i]); num++) {
+        for (long long int num = 0; num < combinationRepeatedNum(column.size() + 1, Xs_vector_int[i]); num++) {
             int current_cursor = 1 + i;
             string Xs = Xs_vector_string[j];
             for (int k = 0; k < column.size(); k++) {
@@ -344,12 +348,12 @@ int main(int argc, char** argv) {
             }
             j++;
         }
-        for (int j = 0; j < lines.size(); j++) {
-            if (j == 0) {
+        for (int k = 0; k < lines.size(); k++) {
+            if (k == 0) {
                 clauses.push_back("");
-                clauses[i] = lines[j];
+                clauses[i] = lines[k];
             } else {
-                clauses[i] = "| " + clauses[i] + " " + lines[j];
+                clauses[i] = "| " + clauses[i] + " " + lines[k];
             }
         }
     }

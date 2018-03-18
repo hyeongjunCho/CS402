@@ -23,6 +23,47 @@ vector<string> split(const string& str, int delimiter(int) = ::isspace) {
     return result;
 }
 
+std::string ReplaceAll(std::string &str, const std::string& from, const std::string& to){
+    size_t start_pos = 0; //string처음부터 검사
+    while((start_pos = str.find(from, start_pos)) != std::string::npos)  //from을 찾을 수 없을 때까지
+    {
+        str.replace(start_pos, from.length(), to);
+        start_pos += to.length(); // 중복검사를 피하고 from.length() > to.length()인 경우를 위해서
+    }
+    return str;
+}
+
+string minisatFormFixedToString(string str) {
+    int start_pos = 0;
+    int past_pos = 0;
+    int n;
+    string replacedString;
+    ReplaceAll(str, " 0", "");
+    start_pos = str.find("\n", start_pos);
+    while(start_pos != string::npos)
+    {
+        string line;
+        line = str.substr(past_pos, start_pos - past_pos);
+        start_pos += 1;
+        past_pos = start_pos;
+        n = count(line.begin(), line.end(), ' ');
+        for (int i = 0; i < n; i++) {
+            line = "| " + line;
+        }
+        replacedString = replacedString + line + "\n";
+        start_pos = str.find("\n", start_pos);
+    }
+    n = count(replacedString.begin(), replacedString.end(), '\n');
+    for (int i = 0; i < n - 1; i++) {
+        replacedString = "& " + replacedString;
+    }
+    replace(replacedString.begin(), replacedString.end(), '\n', ' ');
+    ReplaceAll(replacedString, "-", "- ");
+
+    return replacedString;
+}
+
+
 TreeNode::TreeNode(const string val) {
     value = val;
     parent = NULL;
@@ -278,7 +319,10 @@ void CnfTree::NNF() {
 }
 
 TreeNode* CnfTree::NNF(TreeNode* node) {
-    if (node->valueType == 0 || (node->value == "-" && node->left->valueType == 0)) {
+    if (node->valueType == 0) {
+        return node;
+    } else if (node->value == "-" && node->left->valueType == 0) {
+        node->left->parent = node;
         return node;
     } else if (node->value == "-" && node->left->value == "-") {
         TreeNode* temp = node->parent;
@@ -326,7 +370,10 @@ void CnfTree::CNF() {
 }
 
 TreeNode* CnfTree::CNF(TreeNode* node) {
-    if (node->valueType == 0 || (node->value == "-" && node->left->valueType == 0)) {
+    if (node->valueType == 0) {
+        return node;
+    } else if (node->value == "-" && node->left->valueType == 0) {
+        node->left->parent = node;
         return node;
     } else if (node->value == "&") {
         node->left = CNF(node->left);
@@ -389,7 +436,6 @@ int main(int argc, char** argv) {
     CnfTree* negationTree = new CnfTree();
 
     tree->make_tree(str);
-    negationTree->make_tree("- " + str);
 
     // cout << tree->get_prefix() << endl;
     // cout << tree->get_infix() << endl;
@@ -415,15 +461,6 @@ int main(int argc, char** argv) {
     // cout << tree->get_prefix() << endl;
     // cout << tree->get_infix() << endl;
     // cout << tree->get_postfix() << endl;
-    // cout << endl;
-
-    // negationTree->implFree();
-    // negationTree->NNF();
-    // negationTree->CNF();
-
-    // cout << negationTree->get_prefix() << endl;
-    // cout << negationTree->get_infix() << endl;
-    // cout << negationTree->get_postfix() << endl;
     // cout << endl;
 
     string minisat_form = tree->get_minisat_form();
@@ -516,25 +553,130 @@ int main(int argc, char** argv) {
     for (auto str:minisat_form_fixed_vector) {
         minisat_form_fixed = minisat_form_fixed + str + "\n";
     }
-
-    ofstream outf("negationMinisatForm.txt");
-    outf << minisat_form_fixed;
-    outf.close();
-    std::system("rm negationMinisatOut.txt");
-    // std::system("./minisat negationMinisatForm.txt negationMinisatOut.txt");
-    std::system("./minisat negationMinisatForm.txt negationMinisatOut.txt > temptemptemp.temp");
-    std::system("rm temptemptemp.temp");
-
-
-    ifstream negation("negationMinisatOut.txt");
-    getline(negation, str);
-    cout << str << endl;
-    negation.close();
+    minisat_form_fixed = minisat_form_fixed.substr(0, minisat_form_fixed.length() - 1);
+    
     // if (str == "SAT") {
     //     cout << "Not Valid" << endl;
     // } else {
     //     cout << "Valid" << endl;
     // }
+
+    // auto first_new_line = minisat_form_fixed.find_first_of("\n");
+    // string minisat_form_fixed_tree_form = minisat_form_fixed.substr(first_new_line + 1);
+    // minisat_form_fixed_tree_form = minisat_form_fixed_tree_form + "\n";
+    // minisat_form_fixed_tree_form = minisatFormFixedToString(minisat_form_fixed_tree_form);
+    // tree->make_tree(minisat_form_fixed_tree_form);
+
+    // tree->implFree();
+    // tree->NNF();
+    // tree->CNF();
+    // cout << tree->get_prefix() << endl;
+    // cout << tree->get_infix() << endl;
+    cout << minisat_form_fixed << endl;
+    ofstream outTreeFile("minisatForm.txt");
+    outTreeFile << minisat_form_fixed;
+    outTreeFile.close();
+    // std::system("./minisat minisatForm.txt minisatOut.txt");
+    std::system("./minisat minisatForm.txt minisatOut.txt > temptemptemp.temp");
+    std::system("rm temptemptemp.temp");
+
+    ifstream inTreeFile("minisatOut.txt");
+    getline(inTreeFile, str);
+    cout << str << endl;
+    inTreeFile.close();
+
+    // minisat_form = tree->get_minisat_form();
+    
+    // // cout << minisat_form << endl;
+    // minisat_form_fixed_vector.clear();
+    // minisat_form_fixed.clear();
+
+    // e = minisat_form.end();
+    // i = minisat_form.begin();
+    // while (i != e) {
+    //     i = find_if_not(i, e, [](char c) {return c == '\n';});
+    //     if (i == e) break;
+    //     auto j = find_if(i, e, [](char c) {return c == '\n';});
+    //     splited = string(i,j);
+    //     i = j;
+    //     vector<string> splited_vector = split(splited);
+    //     if (splited.c_str()[0] != 'p') {
+    //         sort(splited_vector.begin(), --splited_vector.end());
+    //     }
+    //     splited_vector.erase(unique(splited_vector.begin(), splited_vector.end()), splited_vector.end());
+    //     splited = "";
+    //     for (auto str:splited_vector) {
+    //         splited = splited + str + " ";
+    //     }
+    //     splited = splited.substr(0, splited.length() - 1);
+    //     minisat_form_fixed_vector.push_back(splited);
+    // }
+    // sort(++minisat_form_fixed_vector.begin(), minisat_form_fixed_vector.end());
+    // minisat_form_fixed_vector.erase(unique(minisat_form_fixed_vector.begin(), minisat_form_fixed_vector.end()), minisat_form_fixed_vector.end());
+    // minisat_form_fixed_vector.erase(minisat_form_fixed_vector.begin());
+    // for (auto it = minisat_form_fixed_vector.begin(); it != minisat_form_fixed_vector.end(); it++) {
+    //     string str = *it;
+    //     stringstream ss;
+    //     str.erase(remove(str.begin(), str.end(), '-'), str.end());
+    //     vector<string> temp = split(str);
+    //     sort(temp.begin(), --temp.end());
+    //     for(int i = 0; i < temp.size(); i++) {
+    //         ss << temp[i];
+    //         if (i != temp.size() - 1) {
+    //             ss << " ";
+    //         }
+    //     }
+    //     str = ss.str();
+    //     ss.str("");
+    //     temp.erase(unique(temp.begin(), temp.end()), temp.end());
+    //     for(int i = 0; i < temp.size(); i++) {
+    //         ss << temp[i];
+    //         if (i != temp.size() - 1) {
+    //             ss << " ";
+    //         }
+    //     }
+    //     if (str != ss.str()) {
+    //         its.push_back(it);
+    //     }
+    // }
+    // for (auto it = its.rbegin(); it != its.rend(); it++) {
+    //     minisat_form_fixed_vector.erase(*it);
+    // }
+
+    // delete_lines.clear();
+    // for (int i = 0; i < minisat_form_fixed_vector.size(); i++) {
+    //     for (int j = 0; j < i; j++) {
+    //         vector<string> first = split(minisat_form_fixed_vector[i]);
+    //         vector<string> second = split(minisat_form_fixed_vector[j]);
+    //         int count = 0;
+    //         for (auto k:first) {
+    //             for (auto l:second) {
+    //                 if (k == l) {
+    //                     count++;
+    //                 }
+    //             }
+    //         }
+    //         if (count == first.size()) {
+    //             delete_lines.push_back(j);
+    //         } else if (count == second.size()) {
+    //             delete_lines.push_back(i);
+    //         }
+    //     }
+    // }
+    // sort(delete_lines.begin(), delete_lines.end());
+    // delete_lines.erase(unique(delete_lines.begin(), delete_lines.end()), delete_lines.end());
+    
+    // for (auto i = delete_lines.rbegin(); i != delete_lines.rend(); i++) {
+    //     minisat_form_fixed_vector.erase(minisat_form_fixed_vector.begin() + *i);
+    // }
+
+    // minisat_form_fixed_vector.insert(minisat_form_fixed_vector.begin(), "p cnf " + to_string(tree->get_max_literal()) + " " + to_string(minisat_form_fixed_vector.size()));
+    // for (auto str:minisat_form_fixed_vector) {
+    //     minisat_form_fixed = minisat_form_fixed + str + "\n";
+    // }
+    // minisat_form_fixed = minisat_form_fixed.substr(0, minisat_form_fixed.length() - 1);
+
+    // cout << minisat_form_fixed << endl;
 
     return 0;
 }
