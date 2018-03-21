@@ -2,6 +2,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <list>
 #include <algorithm>
 #include <cmath>
 #include "nonogram.hpp"
@@ -20,18 +21,6 @@ vector<int> split(const string& str, int delimiter(int) = ::isspace) {
         i = j;
     }
     return result;
-}
-
-long long int factorial(int n) {
-    if (n == 1 || n == 0) {
-        return 1;
-    } else {
-        return n * factorial(n - 1);
-    }
-}
-
-long long int combinationRepeatedNum(int n, int m) {
-    return factorial(n + m - 1) / factorial(m) / factorial(n - 1);
 }
 
 void combinationRepeatedList(int* set, int set_size, int n, int m, int index, string* returnValue) {
@@ -63,7 +52,7 @@ int main(int argc, char** argv) {
     vector< vector<int> > columns;
     vector< vector<int> > spaced_rows;
     vector< vector<int> > spaced_columns;
-    string Xs_list;
+    list<string> Xs_list;
     vector<string> Xs_vector_string;
     string splited;
     string formula;
@@ -71,6 +60,7 @@ int main(int argc, char** argv) {
     string formula_column;
     vector<string> clauses;
     vector<int> Xs_vector_int;
+    vector<int> Xs_vector_size;
     ifstream inf(filename.c_str());
     getline(inf, line);
     int num_row = stoi(line);
@@ -105,7 +95,6 @@ int main(int argc, char** argv) {
         spaced_columns.push_back(vec);
     }
 
-    Xs_list = "";
     for (auto row:spaced_rows) {
         int num_space_available = row.size() + 1;
         int num_Xs = columns.size();
@@ -115,28 +104,31 @@ int main(int argc, char** argv) {
         int* set = (int*)malloc(sizeof(int) * num_Xs);
         string Xs = "";
         combinationRepeatedList(set, 0, num_space_available, num_Xs, 0, &Xs);
-        Xs_list += Xs;
+        Xs_list.push_back(Xs);
         Xs_vector_int.push_back(num_Xs);
     }
-    Xs_list += "\n";
-
-    auto e = Xs_list.end();
-    auto i = Xs_list.begin();
-    while (i != e) {
-        i = find_if_not(i, e, [](char c) {return c == '\n';});
-        if (i == e) break;
-        auto j = find_if(i, e, [](char c) {return c == '\n';});
-        splited = string(i,j);
-        i = j;
-        Xs_vector_string.push_back(splited);
+    for (auto str:Xs_list) {
+        auto e = str.end();
+        auto i = str.begin();
+        int past_size = Xs_vector_string.size();
+        while (i != e) {
+            i = find_if_not(i, e, [](char c) {return c == '\n';});
+            if (i == e) break;
+            auto j = find_if(i, e, [](char c) {return c == '\n';});
+            splited = string(i,j);
+            i = j;
+            Xs_vector_string.push_back(splited);
+        }
+        Xs_vector_size.push_back(Xs_vector_string.size() - past_size);
     }
-    cout << Xs_vector_string.size();
-
+    vector<string> lines;
+    vector<long long int> combination_repeated_nums;
     for (int i = 0, j = 0; i < spaced_rows.size(); i++) {
         vector<int> row = spaced_rows[i];
-        vector<string> lines;
+        vector<vector<int>> checked_literals;
         int base = i * columns.size();
-        for (long long int num = 0; num < combinationRepeatedNum(row.size() + 1, Xs_vector_int[i]); num++) {
+        combination_repeated_nums.push_back(Xs_vector_size[i]);
+        for (long long int num = 0; num < Xs_vector_size[i]; num++) {
             int current_cursor = 1 + base;
             string Xs = Xs_vector_string[j];
             for (int k = 0; k < row.size(); k++) {
@@ -150,82 +142,62 @@ int main(int argc, char** argv) {
                     current_cursor += 1;
                 }
                 if (k == row.size() - 1) {
-                    if (lines.size() == num) {
-                        lines.push_back("");
+                    if (checked_literals.size() == num) {
+                        checked_literals.push_back(vector<int>());
                         for (int l = 0; l < row[k]; l++) {
-                            if (l == 0) {
-                                lines[num] = to_string(current_cursor) + " ";
-                                current_cursor++;
-                            } else if (l != row[k] - 1) {
-                                lines[num] = lines[num] + "& " + to_string(current_cursor) + " ";
-                                current_cursor++;                            
-                            } else {
-                                lines[num] = "& " + lines[num] + to_string(current_cursor);
-                                current_cursor++;                                
-                            }
+                            checked_literals[num].push_back(current_cursor);
+                            current_cursor++;
                         }
                     } else {
                         for (int l = 0; l < row[k]; l++) {
-                            if (l == 0 && row[k] != 1) {
-                                lines[num] = "& " + lines[num] + to_string(current_cursor) + " ";
-                                current_cursor++;
-                            } else if (l != row[k] - 1) {
-                                lines[num] = lines[num] + "& " + to_string(current_cursor) + " ";
-                                current_cursor++;                            
-                            } else {
-                                lines[num] = "& " + lines[num] + to_string(current_cursor);
-                                current_cursor++;                                
-                            }
+                            checked_literals[num].push_back(current_cursor);
+                            current_cursor++;
                         }
                     }
                 } else {
-                    if (lines.size() == num) {
-                        lines.push_back("");
+                    if (checked_literals.size() == num) {
+                        checked_literals.push_back(vector<int>());
                         for (int l = 0; l < row[k]; l++) {
-                            if (l == 0 && l == row[k] - 1) {
-                                to_string(current_cursor);
-                                current_cursor++;
-                            } else if (l != row[k] - 1) {
-                                lines[num] = lines[num] + "& " + to_string(current_cursor) + " ";
-                                current_cursor++;
-                            } else {
-                                lines[num] = lines[num] + "- " + to_string(current_cursor) + " ";
-                                current_cursor++;
+                            if (!(rows[i][k] == row[k] && l == row[k]) && !(rows[i][k] != row[k] && l == row[k] - 1)) {
+                                checked_literals[num].push_back(current_cursor);
                             }
+                            current_cursor++;
                         }
                     } else {
                         for (int l = 0; l < row[k]; l++) {
-                            if (l == 0) {
-                                if (l != row[k] - 1) {
-                                    lines[num] = "& " + lines[num] + " " + to_string(current_cursor) + " ";
-                                    current_cursor++;
-                                } else {
-                                    lines[num] = lines[num] + " " + to_string(current_cursor);
-                                    current_cursor++;
-                                }
-                            } else if (l != row[k] - 1) {
-                                lines[num] = "& " + lines[num] + " " + to_string(current_cursor) + " ";
-                                current_cursor++;
-                            } else {
-                                lines[num] = lines[num] + "- " + to_string(current_cursor) + " ";
-                                current_cursor++;                            
+                            if (!(rows[i][k] == row[k] && l == row[k]) && !(rows[i][k] != row[k] && l == row[k] - 1)) {
+                                checked_literals[num].push_back(current_cursor);
                             }
+                            current_cursor++;
                         }
                     }
                 }
             }
             j++;
         }
-        for (int k = 0; k < lines.size(); k++) {
-            if (k == 0) {
-                clauses.push_back("");
-                clauses[i] = lines[k];
-            } else {
-                clauses[i] = "| " + clauses[i] + " " + lines[k];
+        string line;
+        for (int k = 0; k < checked_literals.size(); k++) {
+            for (int l = 0; l < columns.size() - 1; l++) {
+                line += "& ";
+            }
+            for (int m = 1; m <= columns.size(); m++) {
+                int cursor = m + i * columns.size();
+                if (find(checked_literals[k].begin(), checked_literals[k].end(), cursor) != checked_literals[k].end()) {
+                    line += to_string(cursor) + " ";
+                } else {
+                    line += "- " + to_string(cursor) + " ";
+                }
             }
         }
+        lines.push_back(line);
     }
-    
+    for (int k = 0; k < rows.size(); k++) {
+        clauses.push_back("");
+        for (int l = 0; l < combination_repeated_nums[k] - 1; l++) {
+            clauses[k] += "| ";
+        }
+        clauses[k] += lines[k].substr(0, lines[k].length() - 1);
+    }
     for (int i = 0; i < clauses.size(); i++) {
         if (i == 0) {
             formula_row = clauses[i];
@@ -234,10 +206,13 @@ int main(int argc, char** argv) {
         }
     }
 
-    Xs_list = "";
+    Xs_list.clear();
     clauses.clear();
+    lines.clear();
+    combination_repeated_nums.clear();
     Xs_vector_int.clear();
     Xs_vector_string.clear();
+    Xs_vector_size.clear();
 
     for (auto column:spaced_columns) {
         int num_space_available = column.size() + 1;
@@ -248,27 +223,30 @@ int main(int argc, char** argv) {
         int* set = (int*)malloc(sizeof(int) * num_Xs);
         string Xs = "";
         combinationRepeatedList(set, 0, num_space_available, num_Xs, 0, &Xs);
-        Xs_list += Xs;
+        Xs_list.push_back(Xs);
         Xs_vector_int.push_back(num_Xs);
     }
-    Xs_list += "\n";
     
-    e = Xs_list.end();
-    i = Xs_list.begin();
-    while (i != e) {
-        i = find_if_not(i, e, [](char c) {return c == '\n';});
-        if (i == e) break;
-        auto j = find_if(i, e, [](char c) {return c == '\n';});
-        splited = string(i,j);
-        i = j;
-        Xs_vector_string.push_back(splited);
+    for (auto str:Xs_list) {
+        auto e = str.end();
+        auto i = str.begin();
+        int past_size = Xs_vector_string.size();
+        while (i != e) {
+            i = find_if_not(i, e, [](char c) {return c == '\n';});
+            if (i == e) break;
+            auto j = find_if(i, e, [](char c) {return c == '\n';});
+            splited = string(i,j);
+            i = j;
+            Xs_vector_string.push_back(splited);
+        }
+        Xs_vector_size.push_back(Xs_vector_string.size() - past_size);
     }
-
     for (int i = 0, j = 0; i < spaced_columns.size(); i++) {
         vector<int> column = spaced_columns[i];
-        vector<string> lines;
+        vector<vector<int>> checked_literals;
         int base = i;
-        for (long long int num = 0; num < combinationRepeatedNum(column.size() + 1, Xs_vector_int[i]); num++) {
+        combination_repeated_nums.push_back(Xs_vector_size[i]);
+        for (long long int num = 0; num < Xs_vector_size[i]; num++) {
             int current_cursor = 1 + i;
             string Xs = Xs_vector_string[j];
             for (int k = 0; k < column.size(); k++) {
@@ -282,80 +260,61 @@ int main(int argc, char** argv) {
                     current_cursor += columns.size();
                 }
                 if (k == column.size() - 1) {
-                    if (lines.size() == num) {
-                        lines.push_back("");
+                    if (checked_literals.size() == num) {
+                        checked_literals.push_back(vector<int>());
                         for (int l = 0; l < column[k]; l++) {
-                            if (l == 0) {
-                                lines[num] = to_string(current_cursor) + " ";
-                                current_cursor += columns.size();
-                            } else if (l != column[k] - 1) {
-                                lines[num] = lines[num] + "& " + to_string(current_cursor) + " ";
-                                current_cursor += columns.size();                            
-                            } else {
-                                lines[num] = "& " + lines[num] + to_string(current_cursor);
-                                current_cursor += columns.size();                                
-                            }
+                            checked_literals[num].push_back(current_cursor);
+                            current_cursor += columns.size();                                
                         }
                     } else {
                         for (int l = 0; l < column[k]; l++) {
-                            if (l == 0 && column[k] != 1) {
-                                lines[num] = "& " + lines[num] + to_string(current_cursor) + " ";
-                                current_cursor += columns.size();
-                            } else if (l != column[k] - 1) {
-                                lines[num] = lines[num] + "& " + to_string(current_cursor) + " ";
-                                current_cursor += columns.size();                            
-                            } else {
-                                lines[num] = "& " + lines[num] + to_string(current_cursor);
-                                current_cursor += columns.size();                                
-                            }
+                            checked_literals[num].push_back(current_cursor);
+                            current_cursor += columns.size();
                         }
                     }
                 } else {
-                    if (lines.size() == num) {
-                        lines.push_back("");
+                    if (checked_literals.size() == num) {
+                        checked_literals.push_back(vector<int>());
                         for (int l = 0; l < column[k]; l++) {
-                            if (l == 0 && l == column[k] - 1) {
-                                to_string(current_cursor);
-                                current_cursor += columns.size();
-                            } else if (l != column[k] - 1) {
-                                lines[num] = lines[num] + "& " + to_string(current_cursor) + " ";
-                                current_cursor += columns.size();
-                            } else {
-                                lines[num] = lines[num] + "- " + to_string(current_cursor) + " ";
-                                current_cursor += columns.size();
+                            if (!(columns[i][k] == column[k] && l == column[k]) && !(columns[i][k] != column[k] && l == column[k] - 1)) {
+                                checked_literals[num].push_back(current_cursor);
                             }
+                            current_cursor++;
                         }
                     } else {
                         for (int l = 0; l < column[k]; l++) {
-                            if (l == 0) {
-                                if (l != column[k] - 1) {
-                                    lines[num] = "& " + lines[num] + " " + to_string(current_cursor) + " ";
-                                    current_cursor += columns.size();
-                                } else {
-                                    lines[num] = lines[num] + " " + to_string(current_cursor);
-                                    current_cursor += columns.size();
-                                }
-                            } else if (l != column[k] - 1) {
-                                lines[num] = "& " + lines[num] + " " + to_string(current_cursor) + " ";
-                                current_cursor += columns.size();
-                            } else {
-                                lines[num] = lines[num] + "- " + to_string(current_cursor) + " ";
-                                current_cursor += columns.size();                            
+                            if (!(columns[i][k] == column[k] && l == column[k]) && !(columns[i][k] != column[k] && l == column[k] - 1)) {
+                                checked_literals[num].push_back(current_cursor);
                             }
+                            current_cursor++;
                         }
                     }
                 }
             }
             j++;
         }
-        for (int k = 0; k < lines.size(); k++) {
-            if (k == 0) {
-                clauses.push_back("");
-                clauses[i] = lines[k];
-            } else {
-                clauses[i] = "| " + clauses[i] + " " + lines[k];
+        string line;
+        for (int k = 0; k < checked_literals.size(); k++) {
+            for (int l = 0; l < columns.size() - 1; l++) {
+                line += "& ";
+            }
+            for (int m = 0; m < rows.size(); m++) {
+                int cursor = i + 1 + m * rows.size();
+                if (find(checked_literals[k].begin(), checked_literals[k].end(), cursor) != checked_literals[k].end()) {
+                    line += to_string(cursor) + " ";
+                } else {
+                    line += "- " + to_string(cursor) + " ";
+                }
             }
         }
+        lines.push_back(line);        
+    }
+    for (int k = 0; k < columns.size(); k++) {
+        clauses.push_back("");
+        for (int l = 0; l < combination_repeated_nums[k] - 1; l++) {
+            clauses[k] += "| ";
+        }
+        clauses[k] += lines[k].substr(0, lines[k].length() - 1);
     }
     for (int i = 0; i < clauses.size(); i++) {
         if (i == 0) {

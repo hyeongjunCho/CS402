@@ -78,6 +78,10 @@ TreeNode::TreeNode(const string val) {
     }
 }
 
+CnfTree::CnfTree() {
+    root = NULL;
+}
+
 CnfTree::~CnfTree() {
     clean(root);
 }
@@ -93,45 +97,79 @@ void CnfTree::clean(TreeNode* root) {
 
 void CnfTree::make_tree(const string expr) {
     vector<string> vals = split(expr);
-    for (auto s:vals) {
+    for (auto it = vals.rbegin(); it != vals.rend(); it++) {
+        string s = *it;
+        TreeNode* node = new TreeNode(s);
         if (s[0] == '&' || s[0] == '|' || s[0] == '>' || s[0] == '<' || s[0] == '=') {
-            // binary operator
-            TreeNode* op = new TreeNode(s);
-            if (op_stack.empty()) {
-                root = op;
-            } else {
-                op->parent = *op_stack.top();
-                *op_stack.top() = op;
-                op_stack.pop();
-            }
-            op_stack.push(&op->right);
-            op_stack.push(&op->left);
+            node->left = exp_stack.top();
+            node->left->parent = node;
+            exp_stack.pop();
+            node->right = exp_stack.top();
+            node->right->parent = node;
+            exp_stack.pop();
+            exp_stack.push(node);
         } else if (s[0] == '-') {
-            // unary operator
-            TreeNode* op = new TreeNode(s);
-            if (op_stack.empty()) {
-                root = op;
-            } else {
-                op->parent = *op_stack.top();
-                *op_stack.top() = op;
-                op_stack.pop();
-            }
-            op_stack.push(&op->left);
+            node->left = exp_stack.top();
+            node->left->parent = node;
+            exp_stack.pop();
+            exp_stack.push(node);
         } else {
-            // literal
-            TreeNode* l = new TreeNode(s);
-            if (op_stack.empty()) {
-                root = l;
-            } else {
-                l->parent = *op_stack.top();
-                *op_stack.top() = l;
-                op_stack.pop();
-                if (!(find(begin(literals), end(literals), l->value) != end(literals))) {
-                    literals.push_back(l->value);
-                }
-            }
+            exp_stack.push(node);
         }
     }
+    // while (op_stack.empty() == false) {
+    //     TreeNode* node = op_stack.top();
+    //     op_stack.pop();
+    //     node->left = exp_stack.top();
+    //     node->left->parent = node;
+    //     exp_stack.pop();
+    //     if (exp_stack.empty() == false && node->value != "-") {
+    //         node->right = exp_stack.top();
+    //         node->right->parent = node;
+    //         exp_stack.pop();
+    //     }
+    //     exp_stack.push(node);
+    // }
+    root = exp_stack.top();
+    // for (auto s:vals) {
+    //     if (s[0] == '&' || s[0] == '|' || s[0] == '>' || s[0] == '<' || s[0] == '=') {
+    //         // binary operator
+    //         TreeNode* op = new TreeNode(s);
+    //         if (root == NULL) {
+    //             root = op;
+    //         } else {
+    //             op->parent = *op_stack.top();
+    //             *op_stack.top() = op;
+    //             op_stack.pop();
+    //         }
+    //         op_stack.push(&op->right);
+    //         op_stack.push(&op->left);
+    //     } else if (s[0] == '-') {
+    //         // unary operator
+    //         TreeNode* op = new TreeNode(s);
+    //         if (root == NULL) {
+    //             root = op;
+    //         } else {
+    //             op->parent = *op_stack.top();
+    //             *op_stack.top() = op;
+    //             op_stack.pop();
+    //         }
+    //         op_stack.push(&op->left);
+    //     } else {
+    //         // literal
+    //         TreeNode* l = new TreeNode(s);
+    //         if (root == NULL) {
+    //             root = l;
+    //         } else {
+    //             l->parent = *op_stack.top();
+    //             *op_stack.top() = l;
+    //             op_stack.pop();
+    //             if (!(find(begin(literals), end(literals), l->value) != end(literals))) {
+    //                 literals.push_back(l->value);
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 vector<string> CnfTree::get_literals() {
@@ -316,6 +354,7 @@ TreeNode* CnfTree::implFree(TreeNode* node) {
 
 void CnfTree::NNF() {
     root = NNF(root);
+    root = compact_tree(root);
 }
 
 TreeNode* CnfTree::NNF(TreeNode* node) {
@@ -367,6 +406,7 @@ TreeNode* CnfTree::NNF(TreeNode* node) {
 
 void CnfTree::CNF() {
     root = CNF(root);
+    root = compact_tree(root);
 }
 
 TreeNode* CnfTree::CNF(TreeNode* node) {
@@ -420,6 +460,53 @@ TreeNode* CnfTree::distr(TreeNode* node1, TreeNode* node2) {
     return temp;
 }
 
+TreeNode* CnfTree::compact_tree(TreeNode* node) {
+    if (node == nullptr) return NULL;
+    string a, b;
+
+    if (node->value == "|") {
+        string left = get_prefix(node->left);
+        string right = get_prefix(node->right);
+        if (right.length() > 2 && left == right.substr(2)) {
+            node->left = new TreeNode("1");
+            node->right = new TreeNode("-");
+            node->right->left = new TreeNode("1");
+            return node;
+        } else if (left.length() > 2 && right == left.substr(2)) {
+            node->left = new TreeNode("1");
+            node->right = new TreeNode("-");
+            node->right->left = new TreeNode("1");
+            return node;
+        }
+    }
+
+    if (node->value == "&") {
+        string left = get_prefix(node->left);
+        string right = get_prefix(node->right);
+        if (right.length() > 2 && left == right.substr(2)) {
+            node->left = new TreeNode("1");
+            node->right = new TreeNode("-");
+            node->right->left = new TreeNode("1");
+            return node;
+        } else if (left.length() > 2 && right == left.substr(2)) {
+            node->left = new TreeNode("1");
+            node->right = new TreeNode("-");
+            node->right->left = new TreeNode("1");
+            return node;
+        }
+    }
+
+    if (node->left) {
+        compact_tree(node->left);
+    }
+
+    if (node->right) {
+        compact_tree(node->right);
+    }
+
+    return node;
+}
+
 int main(int argc, char** argv) {
     if (argc != 2) {
         cout << "error... ./cnf <filename>" << endl;
@@ -437,28 +524,28 @@ int main(int argc, char** argv) {
 
     tree->make_tree(str);
 
-    // cout << tree->get_prefix() << endl;
+    cout << tree->get_prefix() << endl;
     // cout << tree->get_infix() << endl;
     // cout << tree->get_postfix() << endl;
     // cout << endl;
 
     tree->implFree();
 
-    // cout << tree->get_prefix() << endl;
+    cout << tree->get_prefix() << endl;
     // cout << tree->get_infix() << endl;
     // cout << tree->get_postfix() << endl;
     // cout << endl;
 
     tree->NNF();
 
-    // cout << tree->get_prefix() << endl;
+    cout << tree->get_prefix() << endl;
     // cout << tree->get_infix() << endl;
     // cout << tree->get_postfix() << endl;
     // cout << endl;
 
     tree->CNF();
 
-    // cout << tree->get_prefix() << endl;
+    cout << tree->get_prefix() << endl;
     // cout << tree->get_infix() << endl;
     // cout << tree->get_postfix() << endl;
     // cout << endl;

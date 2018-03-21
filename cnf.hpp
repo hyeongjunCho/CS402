@@ -18,6 +18,7 @@ class TreeNode
 class CnfTree
 {
     public:
+        CnfTree();
         ~CnfTree();
         void clean(TreeNode* root);
         void make_tree(const string expr);
@@ -31,7 +32,8 @@ class CnfTree
         void NNF();
         void CNF();
     private:
-        stack<TreeNode**> op_stack; // Not stack of TreeNode list
+        // stack<TreeNode**> op_stack; // Not stack of TreeNode list
+        stack<TreeNode*> exp_stack;
         string get_prefix(TreeNode* node);
         string get_postfix(TreeNode* node);
         string get_infix(TreeNode* node);
@@ -40,6 +42,7 @@ class CnfTree
         TreeNode* NNF(TreeNode* node);
         TreeNode* CNF(TreeNode* node);
         TreeNode* distr(TreeNode* node1, TreeNode* node2);
+        TreeNode* compact_tree(TreeNode* node);
         TreeNode* root;
         vector<string> literals;
         int CNF_clauses;
