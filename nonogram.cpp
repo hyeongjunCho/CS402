@@ -97,7 +97,7 @@ int main(int argc, char** argv) {
 
     for (auto row:spaced_rows) {
         int num_space_available = row.size() + 1;
-        int num_Xs = columns.size();
+        int num_Xs = num_column;
         for (auto i:row) {
             num_Xs -= i;
         }
@@ -126,7 +126,7 @@ int main(int argc, char** argv) {
     for (int i = 0, j = 0; i < spaced_rows.size(); i++) {
         vector<int> row = spaced_rows[i];
         vector<vector<int>> checked_literals;
-        int base = i * columns.size();
+        int base = i * num_column;
         combination_repeated_nums.push_back(Xs_vector_size[i]);
         for (long long int num = 0; num < Xs_vector_size[i]; num++) {
             int current_cursor = 1 + base;
@@ -139,7 +139,7 @@ int main(int argc, char** argv) {
                     if ((int)(Xs.c_str()[l]) - 48 < k) {
                         continue;
                     }
-                    current_cursor += 1;
+                    current_cursor++;
                 }
                 if (k == row.size() - 1) {
                     if (checked_literals.size() == num) {
@@ -177,11 +177,11 @@ int main(int argc, char** argv) {
         }
         string line;
         for (int k = 0; k < checked_literals.size(); k++) {
-            for (int l = 0; l < columns.size() - 1; l++) {
+            for (int l = 0; l < num_column - 1; l++) {
                 line += "& ";
             }
-            for (int m = 1; m <= columns.size(); m++) {
-                int cursor = m + i * columns.size();
+            for (int m = 1; m <= num_column; m++) {
+                int cursor = m + i * num_column;
                 if (find(checked_literals[k].begin(), checked_literals[k].end(), cursor) != checked_literals[k].end()) {
                     line += to_string(cursor) + " ";
                 } else {
@@ -257,19 +257,19 @@ int main(int argc, char** argv) {
                     if ((int)(Xs.c_str()[l]) - 48 < k) {
                         continue;
                     }
-                    current_cursor += columns.size();
+                    current_cursor += num_column;
                 }
                 if (k == column.size() - 1) {
                     if (checked_literals.size() == num) {
                         checked_literals.push_back(vector<int>());
                         for (int l = 0; l < column[k]; l++) {
                             checked_literals[num].push_back(current_cursor);
-                            current_cursor += columns.size();                                
+                            current_cursor += num_column;                                
                         }
                     } else {
                         for (int l = 0; l < column[k]; l++) {
                             checked_literals[num].push_back(current_cursor);
-                            current_cursor += columns.size();
+                            current_cursor += num_column;
                         }
                     }
                 } else {
@@ -279,14 +279,14 @@ int main(int argc, char** argv) {
                             if (!(columns[i][k] == column[k] && l == column[k]) && !(columns[i][k] != column[k] && l == column[k] - 1)) {
                                 checked_literals[num].push_back(current_cursor);
                             }
-                            current_cursor++;
+                            current_cursor += num_column;
                         }
                     } else {
                         for (int l = 0; l < column[k]; l++) {
                             if (!(columns[i][k] == column[k] && l == column[k]) && !(columns[i][k] != column[k] && l == column[k] - 1)) {
                                 checked_literals[num].push_back(current_cursor);
                             }
-                            current_cursor++;
+                            current_cursor += num_column;
                         }
                     }
                 }
@@ -295,7 +295,7 @@ int main(int argc, char** argv) {
         }
         string line;
         for (int k = 0; k < checked_literals.size(); k++) {
-            for (int l = 0; l < columns.size() - 1; l++) {
+            for (int l = 0; l < rows.size() - 1; l++) {
                 line += "& ";
             }
             for (int m = 0; m < rows.size(); m++) {
@@ -309,7 +309,7 @@ int main(int argc, char** argv) {
         }
         lines.push_back(line);        
     }
-    for (int k = 0; k < columns.size(); k++) {
+    for (int k = 0; k < num_column; k++) {
         clauses.push_back("");
         for (int l = 0; l < combination_repeated_nums[k] - 1; l++) {
             clauses[k] += "| ";

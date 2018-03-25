@@ -10,6 +10,8 @@ class TreeNode
 {
     public:
         TreeNode(const string val);
+        ~TreeNode();
+        void Free();
         string value;
         int valueType; // 0: literal, 1: unary op, 2: binary op
         TreeNode *parent, *left, *right;
