@@ -298,8 +298,8 @@ int main(int argc, char** argv) {
             for (int l = 0; l < rows.size() - 1; l++) {
                 line += "& ";
             }
-            for (int m = 0; m < rows.size(); m++) {
-                int cursor = i + 1 + m * rows.size();
+            for (int m = 0; m < num_row; m++) {
+                int cursor = i + 1 + m * num_column;
                 if (find(checked_literals[k].begin(), checked_literals[k].end(), cursor) != checked_literals[k].end()) {
                     line += to_string(cursor) + " ";
                 } else {

@@ -24,11 +24,11 @@ vector<string> split(const string& str, int delimiter(int) = ::isspace) {
 }
 
 std::string ReplaceAll(std::string &str, const std::string& from, const std::string& to){
-    size_t start_pos = 0; //string처음부터 검사
-    while((start_pos = str.find(from, start_pos)) != std::string::npos)  //from을 찾을 수 없을 때까지
+    size_t start_pos = 0;
+    while((start_pos = str.find(from, start_pos)) != std::string::npos)
     {
         str.replace(start_pos, from.length(), to);
-        start_pos += to.length(); // 중복검사를 피하고 from.length() > to.length()인 경우를 위해서
+        start_pos += to.length();
     }
     return str;
 }
@@ -63,12 +63,12 @@ string minisatFormFixedToString(string str) {
     return replacedString;
 }
 
-
 TreeNode::TreeNode(const string val) {
     value = val;
-    parent = NULL;
+    parent.reset();
     left = NULL;
     right = NULL;
+    num = node_num++;
     if (val == "-") {
         valueType = 1;
     } else if (val == "&" || val == "|" || val == ">" || val == "<" || val == "=") {
@@ -81,42 +81,32 @@ TreeNode::TreeNode(const string val) {
 TreeNode::~TreeNode() {
 }
 
-void TreeNode::Free() {
-    if (left) {
-        left->Free();
-        delete left;
-        left = NULL;
-    }
-    if (right) {
-        right->Free();
-        delete right;
-        right = NULL;    
-    }
-    delete this;
-}
+// void TreeNode::Free() {
+//     if (left) {
+//         left->Free();
+//         delete left;
+//         left = NULL;
+//     }
+//     if (right) {
+//         right->Free();
+//         delete right;
+//         right = NULL;    
+//     }
+// }
 
 CnfTree::CnfTree() {
     root = NULL;
 }
 
 CnfTree::~CnfTree() {
-    clean(root);
-}
-
-void CnfTree::clean(TreeNode* root) {
-    if (root->value.size() != 0) {
-        clean(root->left);
-        clean(root->right);
-    } else {
-        root->Free();
-    }
+    root = NULL;
 }
 
 void CnfTree::make_tree(const string expr) {
     vector<string> vals = split(expr);
     for (auto it = vals.rbegin(); it != vals.rend(); it++) {
         string s = *it;
-        TreeNode* node = new TreeNode(s);
+        shared_ptr<TreeNode> node(new TreeNode(s));
         if (s[0] == '&' || s[0] == '|' || s[0] == '>' || s[0] == '<' || s[0] == '=') {
             node->left = exp_stack.top();
             node->left->parent = node;
@@ -157,33 +147,73 @@ int CnfTree::get_max_literal() {
     return get_literals().size();
 }
 
+void CnfTree::check_parent() {
+    int c0 = 0;
+    int c1 = 0;
+    check_parent(root, &c0, &c1);
+    cout << "c0" << c0 << endl;
+    cout << "c1" << c1 << endl;
+}
+
+void CnfTree::check_parent(shared_ptr<TreeNode> node, int* count0, int* count1) {
+    if (node->left) {
+        shared_ptr<TreeNode> temp = node->left->parent.lock();
+        if (temp->num == node->num) {
+            *count1 += 1;
+        } else {
+            *count0 += 1;
+        }
+        // cout << node->left->parent->num << "  " << node->num << endl;
+    }
+    if (node->right) {
+        shared_ptr<TreeNode> temp = node->right->parent.lock();
+        if (temp->num == node->num) {
+            *count1 += 1;
+        } else {
+            *count0 += 1;
+        }
+        // cout << node->right->parent->num << "  " << node->num << endl;
+    }
+    if (node->left) {
+        check_parent(node->left, count0, count1);
+    }
+    if (node->right) {
+        check_parent(node->right, count0, count1);
+    }
+}
+
+void CnfTree::set_parent(shared_ptr<TreeNode> node) {
+    if (node->left) {
+        node->left->parent = node;
+    }
+    if (node->right) {
+        node->right->parent = node;
+    }
+    if (node->left) {
+        set_parent(node->left);        
+    }
+    if (node->right) {
+        set_parent(node->right);        
+    }
+}
+
 string CnfTree::get_prefix() {
     return get_prefix(root);
 }
 
-string CnfTree::get_prefix(TreeNode* node) {
-    if (!node) return "";
+string CnfTree::get_prefix(shared_ptr<TreeNode> node) {
+    if (node.use_count() == 0) return "";
     string a, b;
     
-    if (node->left) {
-        if (node->valueType == 2) {
-            a = get_prefix(node->left) + " ";
-        } else {
-            a = get_prefix(node->left);
-        }
-    } else {
-        a = "";
+    if (node->valueType == 2) {
+        a = get_prefix(node->left) + " ";
+        b = get_prefix(node->right);
+    } else if (node->valueType == 1) {
+        a = get_prefix(node->left);
     }
 
-    if (node->right) {
-        b = get_prefix(node->right);
-    } else {
-        b = "";
-    }
     if (node->valueType == 0) {
         return node->value;
-    } else if (node->valueType == 1) {
-        return node->value + " " + a;
     } else {
         return node->value + " " + a + b;
     }
@@ -193,8 +223,8 @@ string CnfTree::get_postfix() {
     return get_postfix(root);
 }
 
-string CnfTree::get_postfix(TreeNode* node) {
-    if (!node) return "";
+string CnfTree::get_postfix(shared_ptr<TreeNode> node) {
+    if (node.use_count() == 0) return "";
     string a, b;
     
     if (node->left) {
@@ -215,24 +245,16 @@ string CnfTree::get_infix() {
     return get_infix(root);
 }
 
-string CnfTree::get_infix(TreeNode* node) {
-    if (!node) return "";
+string CnfTree::get_infix(shared_ptr<TreeNode> node) {
+    if (node.use_count() == 0) return "";
     string a, b;
-    
-    if (node->left) {
-        if (node->valueType == 2) {
-            a = get_infix(node->left) + " ";
-        } else {
-            a = get_infix(node->left);
-        }
-    } else {
-        a = "";
-    }
 
-    if (node->right) {
+    
+    if (node->valueType == 2) {
+        a = get_infix(node->left) + " ";
         b = get_infix(node->right);
-    } else {
-        b = "";
+    } else if (node->valueType == 1) {
+        a = get_infix(node->left) + " ";
     }
     
     if (node->valueType == 0) {
@@ -240,8 +262,9 @@ string CnfTree::get_infix(TreeNode* node) {
     } else if (node->valueType == 1) {
         return node->value + " " + a;
     } else {
-        if ((node->parent && node->parent->value == node->value && node->value == "&") ||
-        (node->parent && node->parent->value == node->value && node->value == "|") ||
+        shared_ptr<TreeNode> temp = node->parent.lock();        
+        if ((temp && temp->value == node->value && node->value == "&") ||
+        (temp && temp->value == node->value && node->value == "|") ||
         node == root) {
             return a + node->value + " " + b;
         }
@@ -259,7 +282,7 @@ string CnfTree::get_minisat_form() {
     return "p cnf " + to_string(literals.size()) + " " + to_string(CNF_clauses) + "\n" + expression;
 }
 
-string CnfTree::get_minisat_form(TreeNode* node) {
+string CnfTree::get_minisat_form(shared_ptr<TreeNode> node) {
     if (!node) return "";
     string a, b;
     if (node->left) {
@@ -278,11 +301,11 @@ string CnfTree::get_minisat_form(TreeNode* node) {
         if (!node->value.empty() && find_if(node->value.begin(),
         node->value.end(),
         [](char c) { return !isdigit(c); }) == node->value.end()) {
-            // return *find(begin(literals), end(literals), node->value);
+
             return node->value;
         }
         return node->value;
-        // return to_string(distance(begin(literals), find(begin(literals), end(literals), node->value)) + 1);
+
     } else if (node->valueType == 1) {
         return node->value + a;
     } else if (node->value == "&") {
@@ -295,77 +318,68 @@ string CnfTree::get_minisat_form(TreeNode* node) {
 
 void CnfTree::implFree() {
     root = implFree(root);
+    set_parent(root);
+    // check_parent();
 }
 
-TreeNode* CnfTree::implFree(TreeNode* node) {
+shared_ptr<TreeNode> CnfTree::implFree(shared_ptr<TreeNode> node) {
     if (node->valueType == 0) {
         return node;
     } else if (node->value == ">") {
         node->value = "|";
         node->valueType = 2;
-        TreeNode* leftNode = new TreeNode("-");
+        shared_ptr<TreeNode> leftNode(new TreeNode("-"));
         leftNode->left = implFree(node->left);
         node->left = leftNode;
         node->right = implFree(node->right);
-        node->left->parent = node;
-        node->right->parent = node;
     } else if (node->value == "-") {
         node->left = implFree(node->left);
-        node->left->parent = node;
     } else {
         node->left = implFree(node->left);
         node->right = implFree(node->right);
-        node->left->parent = node;
-        node->right->parent = node;
     }
     return node;
 }
 
 void CnfTree::NNF() {
     root = NNF(root);
+    set_parent(root);
+    // check_parent();
 }
 
-TreeNode* CnfTree::NNF(TreeNode* node) {
+shared_ptr<TreeNode> CnfTree::NNF(shared_ptr<TreeNode> node) {
     if (node->valueType == 0) {
         return node;
     } else if (node->value == "-" && node->left->valueType == 0) {
-        node->left->parent = node;
         return node;
     } else if (node->value == "-" && node->left->value == "-") {
-        TreeNode* temp = node->parent;
+        shared_ptr<TreeNode> temp(node->parent.lock());
         node = NNF(node->left->left);
-        node->parent = temp;
     } else if (node->value == "&" || node->value == "|") {
         node->left = NNF(node->left);
         node->right = NNF(node->right);
-        node->left->parent = node;
-        node->right->parent = node;
     } else if (node->value == "-" && node->left->value == "&") {
         node->value = "|";
         node->valueType = 2;
-        TreeNode* leftNode = new TreeNode("-");
+        shared_ptr<TreeNode> leftNode(new TreeNode("-"));
         leftNode->left = node->left->left;
-        TreeNode* rightNode = new TreeNode("-");
+        shared_ptr<TreeNode> rightNode(new TreeNode("-"));
         rightNode->left = node->left->right;
         node->left = leftNode;
         node->right = rightNode;
-        node->left->parent = node;
-        node->right->parent = node;
-        TreeNode* temp = node->parent;
+        shared_ptr<TreeNode> temp(node->parent.lock());
         node = NNF(node);
         node->parent = temp;
     } else if (node->value == "-" && node->left->value == "|") {
         node->value = "&";
         node->valueType = 2;
-        TreeNode* leftNode = new TreeNode("-");
+        shared_ptr<TreeNode> leftNode(new TreeNode("-"));
         leftNode->left = node->left->left;
-        TreeNode* rightNode = new TreeNode("-");
+        shared_ptr<TreeNode> rightNode(new TreeNode("-"));
         rightNode->left = node->left->right;
         node->left = leftNode;
         node->right = rightNode;
-        node->left->parent = node;
-        node->right->parent = node;
-        TreeNode* temp = node->parent;
+        shared_ptr<TreeNode> temp(node->parent.lock());
         node = NNF(node);
         node->parent = temp;
     }
@@ -375,193 +389,215 @@ TreeNode* CnfTree::NNF(TreeNode* node) {
 void CnfTree::CNF() {
     root = CNF(root);
     cout << 1 << endl;
-    root = compact_tree(root);
+    set_parent(root);
+    compact_tree(root);
     cout << 1 << endl;
+    set_parent(root);
 }
 
-TreeNode* CnfTree::CNF(TreeNode* node) {
+shared_ptr<TreeNode> CnfTree::CNF(shared_ptr<TreeNode> node) {
     if (node) {
         if (node->valueType == 0) {
             return node;
         } else if (node->value == "-" && node->left->valueType == 0) {
-            node->left->parent = node;
             return node;
         } else if (node->value == "&") {
             node->left = CNF(node->left);
             node->right = CNF(node->right);
-            node->left->parent = node;
-            node->right->parent = node;
         } else if (node->value == "|") {
-            TreeNode* d = distr(CNF(node->left), CNF(node->right));
+            // node = compact_tree(node);
+            shared_ptr<TreeNode> d = distr(CNF(node->left), CNF(node->right));
+            // node = distr(CNF(node->left), CNF(node->right));
+            // node = d;
             node->value = d->value;
             node->valueType = d->valueType;
             node->left = d->left;
             node->right = d->right;
-            node->left->parent = node;
-            node->right->parent = node;
+            // if (node == node->parent.lock()->left) {
+            //     d = node->parent.lock()->left;
+            //     d->parent = node->parent.lock();
+            // } else if (node == node->parent.lock()->right) {
+            //     d = node->parent.lock()->right;
+            //     d->parent = node->parent.lock();
+            // }
         }
     }
     return node;
 }
 
-TreeNode* CnfTree::distr(TreeNode* node1, TreeNode* node2) {
-    TreeNode* temp;
+shared_ptr<TreeNode> CnfTree::distr(shared_ptr<TreeNode> node1, shared_ptr<TreeNode> node2) {
+    shared_ptr<TreeNode> returnValue;
     if (node1->value == "&") {
-        temp = new TreeNode("&");
-        TreeNode* leftNode = distr(node1->left, node2);
-        TreeNode* rightNode = distr(node1->right, node2);
-        temp->left = leftNode;
-        temp->right = rightNode;
-        temp->left->parent = temp;
-        temp->right->parent = temp;
+        returnValue = make_shared<TreeNode>("&");
+        // shared_ptr<TreeNode> leftNode(distr(node1->left, node2));
+        // shared_ptr<TreeNode> rightNode(distr(node1->right, node2));
+        returnValue->left = distr(node1->left, node2);
+        returnValue->right = distr(node1->right, node2);
     } else if (node2->value == "&") {
-        temp = new TreeNode("&");
-        TreeNode* leftNode = distr(node1, node2->left);
-        TreeNode* rightNode = distr(node1, node2->right);
-        temp->left = leftNode;
-        temp->right = rightNode;
-        temp->left->parent = temp;
-        temp->right->parent = temp;
+        returnValue = make_shared<TreeNode>("&");
+        // shared_ptr<TreeNode> leftNode(distr(node1, node2->left));
+        // shared_ptr<TreeNode> rightNode(distr(node1, node2->right));
+        returnValue->left = distr(node1, node2->left);
+        returnValue->right = distr(node1, node2->right);
     } else {
-        temp = new TreeNode("|");
-        temp->left = node1;
-        temp->right = node2;
-        temp->left->parent = temp;
-        temp->right->parent = temp;
+        returnValue = make_shared<TreeNode>("|");
+        returnValue->left = node1;
+        returnValue->right = node2;
     }
-    return temp;
+    return returnValue;
 }
 
-TreeNode* CnfTree::compact_tree(TreeNode* node) {
-    if (node == NULL) return NULL;
+shared_ptr<TreeNode> CnfTree::compact_tree(shared_ptr<TreeNode> node) {
+    if (node.use_count() == 0) return node;
     string a, b;
-    TreeNode* leftReturn;
-    TreeNode* rightReturn;
 
-    if (node->left) {
-        leftReturn = compact_tree(node->left);
+    if (node->valueType == 1 || node->valueType == 2) {
+        // cout << "node->left->value" << node->left->value << endl;
+        // cout << "node->left->valueType" << node->left->valueType << endl;
+        node->left = compact_tree(node->left);
     }
-    if (node->right) {
-        rightReturn = compact_tree(node->right);
+    if (node->valueType == 2) {
+        // cout << "node->right->value" << node->right->value << endl;
+        // cout << "node->right->valueType" << node->right->valueType << endl;
+        node->right = compact_tree(node->right);
     }
-    if (node == root) {
-        return node;
-    }
-    // if (leftReturn != NULL || rightReturn != NULL) {
-    //     return NULL;
-    // }
+
+    // cout << "node->value" << node->value << endl;
+    // cout << "node->valueType" << node->valueType << endl;
+
+
     if (node->left && node->left->value == "true") {
-        cout << 2 << "    " << node->value << endl;
+        // cout << 2 << "    " << node->value << endl;
+        // cout << "check" << (node == node->left->parent.lock()) << endl;
         if (node->value == "|") {
             node->value = "true";
             node->valueType = 0;
-            node->left->Free();
-            node->right->Free();
-            cout << 4 << "    " << node->value << endl;
+            node->left.reset();
+            node->right.reset();
+            // node->Free();
+            // cout << 4 << "    " << node->value << endl;
         } else if (node->value == "&") {
             if (node->right->value == "true") {
                 node->value = "true";
                 node->valueType = 0;
-                node->left->Free();
-                node->right->Free();
-                cout << 5 << "    " << node->value << endl;
+                node->left.reset();
+                node->right.reset();
+                // node->Free();
+                // cout << 5 << "    " << node->value << endl;
             } else {
+                // node->value = node->right->value;
+                // node->valueType = node->right->valueType;
+                // node->left = node->right->left;
+                // node->left->parent = node;
+                // node->right = node->right->right;
+                // node->right->parent = node;
                 node = node->right;
-                cout << 3 << "    " << node->value << endl;
+                // cout << 3 << "    " << node->value << endl;
             }
         }
         return node;
     } else if (node->right && node->right->value == "true") {
-        cout << 2 << "    " << node->value << endl;
+        // cout << 2 << "    " << node->value << endl;
+        // cout << "check" << (node == node->left->parent.lock()) << endl;
         if (node->value == "|") {
             node->value = "true";
             node->valueType = 0;
-            node->left->Free();
-            node->right->Free();
-            cout << 4 << "    " << node->value << endl;
+            node->left.reset();
+            node->right.reset();
+            // node->Free();
+            // cout << 4 << "    " << node->value << endl;
         } else if (node->value == "&") {
             if (node->left->value == "true") {
                 node->value = "true";
                 node->valueType = 0;
-                node->left->Free();
-                node->right->Free();
-                cout << 5 << "    " << node->value << endl;
+                node->left.reset();
+                node->right.reset();
+                // node->Free();
+                // cout << 5 << "    " << node->value << endl;
             } else {
+                // node->value = node->left->value;
+                // node->valueType = node->left->valueType;
+                // node->left = node->left->left;
+                // node->left->parent = node;
+                // node->right = node->left->right;
+                // node->right->parent = node;
                 node = node->left;
-                cout << 3 << "    " << node->value << endl;
+                // cout << 3 << "    " << node->value << endl;
             }
         }
         return node;
     } else if (node->left && node->left->value == "false") {
-        cout << 2 << "    " << node->value << endl;
+        // cout << 2 << "    " << node->value << endl;
+        // cout << "check" << (node == node->left->parent.lock()) << endl;
         if (node->value == "&") {
             node->value = "false";
             node->valueType = 0;
-            node->left->Free();
-            node->right->Free();
-            cout << 4 << "    " << node->value << endl;
+            node->left.reset();
+            node->right.reset();
+            // node->Free();
+            // cout << 4 << "    " << node->value << endl;
         } else if (node->value == "|") {
             if (node->right->value == "false") {
                 node->value = "false";
                 node->valueType = 0;
-                node->left->Free();
-                node->right->Free();
-                cout << 5 << "    " << node->value << endl;
+                node->left.reset();
+                node->right.reset();
+                // node->Free();
+                // cout << 5 << "    " << node->value << endl;
             } else {
+                // node->value = node->right->value;
+                // node->valueType = node->right->valueType;
+                // node->left = node->right->left;
+                // node->left->parent = node;
+                // node->right = node->right->right;
+                // node->right->parent = node;
                 node = node->right;
-                cout << 3 << "    " << node->value << endl;
+                // cout << 3 << "    " << node->value << endl;
             }
         }
         return node;
     } else if (node->right && node->right->value == "false") {
-        cout << 2 << "    " << node->value << endl;
+        // cout << 2 << "    " << node->value << endl;
+        // cout << "check" << (node == node->left->parent.lock()) << endl;
         if (node->value == "&") {
             node->value = "false";
             node->valueType = 0;
-            node->left->Free();
-            node->right->Free();
-            cout << 4 << "    " << node->value << endl;
+            node->left.reset();
+            node->right.reset();
+            // node->Free();
+            // cout << 4 << "    " << node->value << endl;
         } else if (node->value == "|") {
             if (node->left->value == "false") {
                 node->value = "false";
                 node->valueType = 0;
-                node->left->Free();
-                node->right->Free();
-                cout << 5 << "    " << node->value << endl;
+                node->left.reset();
+                node->right.reset();
+                // node->Free();
+                // cout << 5 << "    " << node->value << endl;
             } else {
+                // node->value = node->left->value;
+                // node->valueType = node->left->valueType;
+                // node->left = node->left->left;
+                // node->left->parent = node;
+                // node->right = node->left->right;
+                // node->right->parent = node;
                 node = node->left;
-                cout << 3 << "    " << node->value << endl;
+                // cout << 3 << "    " << node->value << endl;
             }
         }
         return node;
     } else if (node->value == "|") {
-        string left = get_postfix(node->left);
-        string right = get_postfix(node->right);
+        string left = get_prefix(node->left);
+        string right = get_prefix(node->right);
         vector<string> leftString = split(left);
-        cout << "left" << left << endl;
-        cout << "leftString.size()" << leftString.size() << endl;
+        // cout << "left" << left << endl;
+        // cout << "leftString.size()" << leftString.size() << endl;
+        // cout << "leftValue" << node->left->valueType << endl;
         vector<string> rightString = split(right);
-        cout << "right" << right << endl;
-        cout << "rightString.size()" << rightString.size() << endl;
-        if (leftString.size() == 0 && rightString.size() == 0) {
-            node->left->Free();
-            node->right->Free();
-            node = NULL;
-            return NULL;
-        } else if (leftString.size() == 0) {
-            node->value = node->right->value;
-            node->valueType = node->right->valueType;
-            node->left = node->right->left;
-            node->right = node->right->right;            
-            return NULL;
-        } else if (rightString.size() == 0) {
-            node->value = node->left->value;
-            node->valueType = node->left->valueType;
-            node->left = node->left->left;
-            node->right = node->left->right;
-            return NULL;
-        }
-        if (node->parent && find(leftString.begin(), leftString.end(), "&") == leftString.end() &&
+        // cout << "right" << right << endl;
+        // cout << "rightString.size()" << rightString.size() << endl;
+        // cout << "rightValue" << node->right->valueType << endl;
+        if (node->parent.lock() && find(leftString.begin(), leftString.end(), "&") == leftString.end() &&
         find(rightString.begin(), rightString.end(), "&") == rightString.end()) {
             bool to_break = false;
             for (int i = 0; i < leftString.size(); i++) {
@@ -570,19 +606,17 @@ TreeNode* CnfTree::compact_tree(TreeNode* node) {
                     string r = rightString[j];
                     if (l != "|" && l != "&" && l == r) {
                         if (i > 0 && leftString[i - 1] == "-" && (j == 0 || rightString[j - 1] != "-")) {
-                            node->left->Free();
-                            node->right->Free();
+                            // node->Free();
                             node->value = "true";
                             node->valueType = 0;
                             to_break = true;
                             break;
                         } else if (j > 0 && rightString[j - 1] == "-" && (i == 0 || leftString[i - 1] != "-")) {
-                            node->left->Free();
-                            node->right->Free();
+                            // node->Free();
                             node->value = "true";
                             node->valueType = 0;
                             to_break = true;
-                            break;                            
+                            break;
                         }
                     }
                 }
@@ -591,96 +625,18 @@ TreeNode* CnfTree::compact_tree(TreeNode* node) {
                 }
             }
         }
-        // while (node && node->parent && node->value == "true" && node->parent->value == "|") {
-        //     node = node->parent;
-        //     node->Free();
-        //     node->value = "true";
-        //     node->valueType = 0;
-        // }
-
-        // if (node && node->parent && node->parent->parent && node->value == "true" && node->parent->value == "&") {
-        //     if (node->parent->parent->left == node->parent) {
-        //         if (node->parent->left == node) {
-        //             node->parent->right->parent = node->parent->parent;
-        //             node->parent->parent->left = node->parent->right;
-        //             node = node->parent;
-        //             node->left->Free();
-        //             delete node->left;
-        //             node->left = NULL;
-        //         } else if (node->parent->right == node) {
-        //             node->parent->left->parent = node->parent->parent;
-        //             node->parent->parent->left = node->parent->left;
-        //             node = node->parent;
-        //             node->right->Free();
-        //             delete node->right;
-        //             node->right = NULL;
-        //         }
-        //     } else if (node->parent->parent->right == node->parent) {
-        //         if (node->parent->left == node) {
-        //             node->parent->right->parent = node->parent->parent;
-        //             node->parent->parent->right = node->parent->right;
-        //             node = node->parent;
-        //             node->left->Free();
-        //             delete node->left;
-        //             node->left = NULL;
-        //         } else if (node->parent->right == node) {
-        //             node->parent->left->parent = node->parent->parent;
-        //             node->parent->parent->right = node->parent->left;
-        //             node = node->parent;
-        //             node->right->Free();
-        //             delete node->right;
-        //             node->right = NULL;
-        //         }
-        //     }
-        // } else if (node && !node->parent && node->value == "true") {
-        //     return NULL;
-        // } else if (node && !node->parent->parent && node->value == "true" && node->parent->value == "&") {
-        //     if (node->parent->left == node) {
-        //         node = node->parent;
-        //         node->value = node->right->value;
-        //         node->valueType = node->right->valueType;
-        //         node->left->Free();
-        //         delete node->left;
-        //         node->left = node->right->left;
-        //         node->right = node->right->right;
-        //     } else if (node->parent->right == node) {
-        //         node = node->parent;
-        //         node->value = node->left->value;
-        //         node->valueType = node->left->valueType;
-        //         node->right->Free();
-        //         delete node->right;
-        //         node->left = node->left->left;
-        //         node->right = node->left->right;
-        //     }
-        // }
     } else if (node->value == "&") {
-        string left = get_postfix(node->left);
-        string right = get_postfix(node->right);
+        string left = get_prefix(node->left);
+        string right = get_prefix(node->right);
         vector<string> leftString = split(left);
-        cout << "left" << left << endl;
-        cout << "leftString.size()" << leftString.size() << endl;
+        // cout << "left" << left << endl;
+        // cout << "leftString.size()" << leftString.size() << endl;
+        // cout << "leftValue" << node->left->valueType << endl;
         vector<string> rightString = split(right);
-        cout << "right" << right << endl;
-        cout << "rightString.size()" << rightString.size() << endl;
-        if (leftString.size() == 0 && rightString.size() == 0) {
-            node->left->Free();
-            node->right->Free();
-            node = NULL;
-            return NULL;
-        } else if (leftString.size() == 0) {
-            node->value = node->right->value;
-            node->valueType = node->right->valueType;
-            node->left = node->right->left;
-            node->right = node->right->right;            
-            return NULL;
-        } else if (rightString.size() == 0) {
-            node->value = node->left->value;
-            node->valueType = node->left->valueType;
-            node->left = node->left->left;
-            node->right = node->left->right;
-            return NULL;
-        }
-        if (node->parent && find(leftString.begin(), leftString.end(), "|") == leftString.end() &&
+        // cout << "right" << right << endl;
+        // cout << "rightString.size()" << rightString.size() << endl;
+        // cout << "rightValue" << node->right->valueType << endl;
+        if (node->parent.lock() && find(leftString.begin(), leftString.end(), "|") == leftString.end() &&
         find(rightString.begin(), rightString.end(), "|") == rightString.end()) {
             bool to_break = false;
             for (int i = 0; i < leftString.size(); i++) {
@@ -688,17 +644,15 @@ TreeNode* CnfTree::compact_tree(TreeNode* node) {
                     string l = leftString[i];
                     string r = rightString[j];
                     if (l != "|" && l != "&" && l == r) {
-                        cout << 6 << endl;
+                        // cout << 6 << endl;
                         if (i > 0 && leftString[i - 1] == "-" && (j == 0 || rightString[j - 1] != "-")) {
-                            node->left->Free();
-                            node->right->Free();
+                            // node->Free();
                             node->value = "false";
                             node->valueType = 0;
                             to_break = true;
                             break;
                         } else if (j > 0 && rightString[j - 1] == "-" && (i == 0 || leftString[i - 1] != "-")) {
-                            node->left->Free();
-                            node->right->Free();
+                            // node->Free();
                             node->value = "false";
                             node->valueType = 0;
                             to_break = true;
@@ -711,73 +665,7 @@ TreeNode* CnfTree::compact_tree(TreeNode* node) {
                 }
             }
         }
-        // while (node && node->parent && node->value == "false" && node->parent->value == "&") {
-        //     node = node->parent;
-        //     node->Free();
-        //     node->value = "false";
-        //     node->valueType = 0;
-        // }
-
-        // if (node && node->parent && node->parent->parent && node->value == "false" && node->parent->value == "|") {
-        //     if (node->parent->parent->left == node->parent) {
-        //         if (node->parent->left == node) {
-        //             node->parent->right->parent = node->parent->parent;
-        //             node->parent->parent->left = node->parent->right;
-        //             node = node->parent;
-        //             node->left->Free();
-        //             delete node->left;
-        //             node->left = NULL;
-        //         } else if (node->parent->right == node) {
-        //             node->parent->left->parent = node->parent->parent;
-        //             node->parent->parent->left = node->parent->left;
-        //             node = node->parent;
-        //             node->right->Free();
-        //             delete node->right;
-        //             node->right = NULL;
-        //         }
-        //     } else if (node->parent->parent->right == node->parent) {
-        //         if (node->parent->left == node) {
-        //             node->parent->right->parent = node->parent->parent;
-        //             node->parent->parent->right = node->parent->right;
-        //             node = node->parent;
-        //             node->left->Free();
-        //             delete node->left;
-        //             node->left = NULL;
-        //         } else if (node->parent->right == node) {
-        //             node->parent->left->parent = node->parent->parent;
-        //             node->parent->parent->right = node->parent->left;
-        //             node = node->parent;
-        //             node->right->Free();
-        //             delete node->right;
-        //             node->right = NULL;
-        //         }
-        //     }
-        // } else if (!node->parent && node->value == "false") {
-        //     return NULL;
-        // } else if (!node->parent->parent && node->value == "false" && node->parent->value == "&") {
-        //     if (node->parent->left == node) {
-        //         node = node->parent;
-        //         node->value = node->right->value;
-        //         node->valueType = node->right->valueType;
-        //         node->left->Free();
-        //         delete node->left;
-        //         node->left = node->right->left;
-        //         node->right = node->right->right;
-        //     } else if (node->parent->right == node) {
-        //         node = node->parent;
-        //         node->value = node->left->value;
-        //         node->valueType = node->left->valueType;
-        //         node->right->Free();
-        //         delete node->right;
-        //         node->left = node->left->left;
-        //         node->right = node->left->right;
-        //     }
-        // }
-    } else {
-        return node;
     }
-    // cout << "node->value" << node->value << endl;
-    // cout << "node->parent->value" << node->parent->value << endl;
     return node;
 }
 
@@ -798,31 +686,23 @@ int main(int argc, char** argv) {
 
     tree->make_tree(str);
 
-    cout << tree->get_prefix() << endl;
+    // cout << tree->get_prefix() << endl;
     // cout << tree->get_infix() << endl;
-    // cout << tree->get_postfix() << endl;
-    // cout << endl;
 
     tree->implFree();
 
-    cout << tree->get_prefix() << endl;
+    // cout << tree->get_prefix() << endl;
     // cout << tree->get_infix() << endl;
-    // cout << tree->get_postfix() << endl;
-    // cout << endl;
 
     tree->NNF();
 
-    cout << tree->get_prefix() << endl;
+    // cout << tree->get_prefix() << endl;
     // cout << tree->get_infix() << endl;
-    // cout << tree->get_postfix() << endl;
-    // cout << endl;
 
     tree->CNF();
 
     cout << tree->get_prefix() << endl;
-    // cout << tree->get_infix() << endl;
-    // cout << tree->get_postfix() << endl;
-    // cout << endl;
+    cout << tree->get_infix() << endl;
 
     string minisat_form = tree->get_minisat_form();
     vector<string> minisat_form_fixed_vector;
@@ -913,128 +793,17 @@ int main(int argc, char** argv) {
         minisat_form_fixed = minisat_form_fixed + str + "\n";
     }
     minisat_form_fixed = minisat_form_fixed.substr(0, minisat_form_fixed.length() - 1);
-    
-    // if (str == "SAT") {
-    //     cout << "Not Valid" << endl;
-    // } else {
-    //     cout << "Valid" << endl;
-    // }
-
-    // auto first_new_line = minisat_form_fixed.find_first_of("\n");
-    // string minisat_form_fixed_tree_form = minisat_form_fixed.substr(first_new_line + 1);
-    // minisat_form_fixed_tree_form = minisat_form_fixed_tree_form + "\n";
-    // minisat_form_fixed_tree_form = minisatFormFixedToString(minisat_form_fixed_tree_form);
-    // tree->make_tree(minisat_form_fixed_tree_form);
-
-    // tree->implFree();
-    // tree->NNF();
-    // tree->CNF();
-    // cout << tree->get_prefix() << endl;
-    // cout << tree->get_infix() << endl;
-    ofstream outTreeFile("minisatForm.txt");
+        ofstream outTreeFile("minisatForm.txt");
     outTreeFile << minisat_form_fixed;
     outTreeFile.close();
-    // std::system("./minisat minisatForm.txt minisatOut.txt");
-    std::system("./minisat minisatForm.txt minisatOut.txt > temptemptemp.temp");
-    std::system("rm temptemptemp.temp");
+
+    system("./minisat minisatForm.txt minisatOut.txt > temptemptemp.temp");
+    system("rm temptemptemp.temp");
 
     ifstream inTreeFile("minisatOut.txt");
     getline(inTreeFile, str);
     cout << str << endl;
-    inTreeFile.close();
-
-    // minisat_form = tree->get_minisat_form();
+    inTreeFile.close();    
     
-    // // cout << minisat_form << endl;
-    // minisat_form_fixed_vector.clear();
-    // minisat_form_fixed.clear();
-
-    // e = minisat_form.end();
-    // i = minisat_form.begin();
-    // while (i != e) {
-    //     i = find_if_not(i, e, [](char c) {return c == '\n';});
-    //     if (i == e) break;
-    //     auto j = find_if(i, e, [](char c) {return c == '\n';});
-    //     splited = string(i,j);
-    //     i = j;
-    //     vector<string> splited_vector = split(splited);
-    //     if (splited.c_str()[0] != 'p') {
-    //         sort(splited_vector.begin(), --splited_vector.end());
-    //     }
-    //     splited_vector.erase(unique(splited_vector.begin(), splited_vector.end()), splited_vector.end());
-    //     splited = "";
-    //     for (auto str:splited_vector) {
-    //         splited = splited + str + " ";
-    //     }
-    //     splited = splited.substr(0, splited.length() - 1);
-    //     minisat_form_fixed_vector.push_back(splited);
-    // }
-    // sort(++minisat_form_fixed_vector.begin(), minisat_form_fixed_vector.end());
-    // minisat_form_fixed_vector.erase(unique(minisat_form_fixed_vector.begin(), minisat_form_fixed_vector.end()), minisat_form_fixed_vector.end());
-    // minisat_form_fixed_vector.erase(minisat_form_fixed_vector.begin());
-    // for (auto it = minisat_form_fixed_vector.begin(); it != minisat_form_fixed_vector.end(); it++) {
-    //     string str = *it;
-    //     stringstream ss;
-    //     str.erase(remove(str.begin(), str.end(), '-'), str.end());
-    //     vector<string> temp = split(str);
-    //     sort(temp.begin(), --temp.end());
-    //     for(int i = 0; i < temp.size(); i++) {
-    //         ss << temp[i];
-    //         if (i != temp.size() - 1) {
-    //             ss << " ";
-    //         }
-    //     }
-    //     str = ss.str();
-    //     ss.str("");
-    //     temp.erase(unique(temp.begin(), temp.end()), temp.end());
-    //     for(int i = 0; i < temp.size(); i++) {
-    //         ss << temp[i];
-    //         if (i != temp.size() - 1) {
-    //             ss << " ";
-    //         }
-    //     }
-    //     if (str != ss.str()) {
-    //         its.push_back(it);
-    //     }
-    // }
-    // for (auto it = its.rbegin(); it != its.rend(); it++) {
-    //     minisat_form_fixed_vector.erase(*it);
-    // }
-
-    // delete_lines.clear();
-    // for (int i = 0; i < minisat_form_fixed_vector.size(); i++) {
-    //     for (int j = 0; j < i; j++) {
-    //         vector<string> first = split(minisat_form_fixed_vector[i]);
-    //         vector<string> second = split(minisat_form_fixed_vector[j]);
-    //         int count = 0;
-    //         for (auto k:first) {
-    //             for (auto l:second) {
-    //                 if (k == l) {
-    //                     count++;
-    //                 }
-    //             }
-    //         }
-    //         if (count == first.size()) {
-    //             delete_lines.push_back(j);
-    //         } else if (count == second.size()) {
-    //             delete_lines.push_back(i);
-    //         }
-    //     }
-    // }
-    // sort(delete_lines.begin(), delete_lines.end());
-    // delete_lines.erase(unique(delete_lines.begin(), delete_lines.end()), delete_lines.end());
-    
-    // for (auto i = delete_lines.rbegin(); i != delete_lines.rend(); i++) {
-    //     minisat_form_fixed_vector.erase(minisat_form_fixed_vector.begin() + *i);
-    // }
-
-    // minisat_form_fixed_vector.insert(minisat_form_fixed_vector.begin(), "p cnf " + to_string(tree->get_max_literal()) + " " + to_string(minisat_form_fixed_vector.size()));
-    // for (auto str:minisat_form_fixed_vector) {
-    //     minisat_form_fixed = minisat_form_fixed + str + "\n";
-    // }
-    // minisat_form_fixed = minisat_form_fixed.substr(0, minisat_form_fixed.length() - 1);
-
-    // cout << minisat_form_fixed << endl;
-
     return 0;
 }
