@@ -65,10 +65,10 @@ string minisatFormFixedToString(string str) {
 
 TreeNode::TreeNode(const string val) {
     value = val;
-    parent.reset();
+    parent;
     left = NULL;
     right = NULL;
-    num = node_num++;
+    is_compact = false;
     if (val == "-") {
         valueType = 1;
     } else if (val == "&" || val == "|" || val == ">" || val == "<" || val == "=") {
@@ -108,26 +108,56 @@ void CnfTree::make_tree(const string expr) {
         string s = *it;
         shared_ptr<TreeNode> node(new TreeNode(s));
         if (s[0] == '&' || s[0] == '|' || s[0] == '>' || s[0] == '<' || s[0] == '=') {
-            node->left = exp_stack.top();
-            node->left->parent = node;
+            node->left = shared_ptr<TreeNode>(exp_stack.top());
             exp_stack.pop();
-            node->right = exp_stack.top();
-            node->right->parent = node;
+            node->right = shared_ptr<TreeNode>(exp_stack.top());
             exp_stack.pop();
-            exp_stack.push(node);
+            exp_stack.push(node.get());
+            // node.reset();
         } else if (s[0] == '-') {
-            node->left = exp_stack.top();
-            node->left->parent = node;
+            node->left = shared_ptr<TreeNode>(exp_stack.top());
             exp_stack.pop();
-            exp_stack.push(node);
+            exp_stack.push(node.get());
+            // node.reset();
         } else {
-            exp_stack.push(node);
+            exp_stack.push(node.get());
+            // node.reset();
             if (find(begin(literals), end(literals), node->value) == end(literals)) {
                 literals.push_back(node->value);
             }
         }
     }
-    root = exp_stack.top();
+    root = shared_ptr<TreeNode>(exp_stack.top());
+    while(!exp_stack.empty()) exp_stack.pop();
+}
+
+shared_ptr<TreeNode> CnfTree::make_sub_tree(const string expr) {
+    vector<string> vals = split(expr);
+    while(!exp_stack.empty()) exp_stack.pop();
+    for (auto it = vals.rbegin(); it != vals.rend(); it++) {
+        string s = *it;
+        shared_ptr<TreeNode> node = make_shared<TreeNode>(s);
+        if (s[0] == '&' || s[0] == '|' || s[0] == '>' || s[0] == '<' || s[0] == '=') {
+            node->left = shared_ptr<TreeNode>(exp_stack.top());
+            exp_stack.pop();
+            node->right = shared_ptr<TreeNode>(exp_stack.top());
+            exp_stack.pop();
+            exp_stack.push(node.get());
+            // node.reset();
+        } else if (s[0] == '-') {
+            node->left = shared_ptr<TreeNode>(exp_stack.top());
+            exp_stack.pop();
+            exp_stack.push(node.get());
+            // node.reset();
+        } else {
+            exp_stack.push(node.get());
+            if (find(begin(literals), end(literals), node->value) == end(literals)) {
+                literals.push_back(node->value);
+            }
+            // node.reset();
+        }
+    }
+    return shared_ptr<TreeNode>(exp_stack.top());
 }
 
 vector<string> CnfTree::get_literals() {
@@ -158,7 +188,7 @@ void CnfTree::check_parent() {
 void CnfTree::check_parent(shared_ptr<TreeNode> node, int* count0, int* count1) {
     if (node->left) {
         shared_ptr<TreeNode> temp = node->left->parent.lock();
-        if (temp->num == node->num) {
+        if (temp == node) {
             *count1 += 1;
         } else {
             *count0 += 1;
@@ -167,7 +197,7 @@ void CnfTree::check_parent(shared_ptr<TreeNode> node, int* count0, int* count1) 
     }
     if (node->right) {
         shared_ptr<TreeNode> temp = node->right->parent.lock();
-        if (temp->num == node->num) {
+        if (temp == node) {
             *count1 += 1;
         } else {
             *count0 += 1;
@@ -203,6 +233,7 @@ string CnfTree::get_prefix() {
 
 string CnfTree::get_prefix(shared_ptr<TreeNode> node) {
     if (node.use_count() == 0) return "";
+    cout << node.use_count() << endl;
     string a, b;
     
     if (node->valueType == 2) {
@@ -328,7 +359,7 @@ shared_ptr<TreeNode> CnfTree::implFree(shared_ptr<TreeNode> node) {
     } else if (node->value == ">") {
         node->value = "|";
         node->valueType = 2;
-        shared_ptr<TreeNode> leftNode(new TreeNode("-"));
+        shared_ptr<TreeNode> leftNode = make_shared<TreeNode>("-");
         leftNode->left = implFree(node->left);
         node->left = leftNode;
         node->right = implFree(node->right);
@@ -361,9 +392,9 @@ shared_ptr<TreeNode> CnfTree::NNF(shared_ptr<TreeNode> node) {
     } else if (node->value == "-" && node->left->value == "&") {
         node->value = "|";
         node->valueType = 2;
-        shared_ptr<TreeNode> leftNode(new TreeNode("-"));
+        shared_ptr<TreeNode> leftNode = make_shared<TreeNode>("-");
         leftNode->left = node->left->left;
-        shared_ptr<TreeNode> rightNode(new TreeNode("-"));
+        shared_ptr<TreeNode> rightNode = make_shared<TreeNode>("-");
         rightNode->left = node->left->right;
         node->left = leftNode;
         node->right = rightNode;
@@ -373,9 +404,9 @@ shared_ptr<TreeNode> CnfTree::NNF(shared_ptr<TreeNode> node) {
     } else if (node->value == "-" && node->left->value == "|") {
         node->value = "&";
         node->valueType = 2;
-        shared_ptr<TreeNode> leftNode(new TreeNode("-"));
+        shared_ptr<TreeNode> leftNode = make_shared<TreeNode>("-");
         leftNode->left = node->left->left;
-        shared_ptr<TreeNode> rightNode(new TreeNode("-"));
+        shared_ptr<TreeNode> rightNode = make_shared<TreeNode>("-");
         rightNode->left = node->left->right;
         node->left = leftNode;
         node->right = rightNode;
@@ -413,6 +444,8 @@ shared_ptr<TreeNode> CnfTree::CNF(shared_ptr<TreeNode> node) {
             node->valueType = d->valueType;
             node->left = d->left;
             node->right = d->right;
+            node->is_compact = d->is_compact;
+            d.reset();
             // if (node == node->parent.lock()->left) {
             //     d = node->parent.lock()->left;
             //     d->parent = node->parent.lock();
@@ -444,11 +477,14 @@ shared_ptr<TreeNode> CnfTree::distr(shared_ptr<TreeNode> node1, shared_ptr<TreeN
         returnValue->left = node1;
         returnValue->right = node2;
     }
+    node1.reset();
+    node2.reset();
     return returnValue;
 }
 
 shared_ptr<TreeNode> CnfTree::compact_tree(shared_ptr<TreeNode> node) {
     if (node.use_count() == 0) return node;
+    if (node->is_compact) return node;
     string a, b;
 
     if (node->valueType == 1 || node->valueType == 2) {
@@ -495,7 +531,6 @@ shared_ptr<TreeNode> CnfTree::compact_tree(shared_ptr<TreeNode> node) {
                 // cout << 3 << "    " << node->value << endl;
             }
         }
-        return node;
     } else if (node->right && node->right->value == "true") {
         // cout << 2 << "    " << node->value << endl;
         // cout << "check" << (node == node->left->parent.lock()) << endl;
@@ -525,7 +560,6 @@ shared_ptr<TreeNode> CnfTree::compact_tree(shared_ptr<TreeNode> node) {
                 // cout << 3 << "    " << node->value << endl;
             }
         }
-        return node;
     } else if (node->left && node->left->value == "false") {
         // cout << 2 << "    " << node->value << endl;
         // cout << "check" << (node == node->left->parent.lock()) << endl;
@@ -555,7 +589,6 @@ shared_ptr<TreeNode> CnfTree::compact_tree(shared_ptr<TreeNode> node) {
                 // cout << 3 << "    " << node->value << endl;
             }
         }
-        return node;
     } else if (node->right && node->right->value == "false") {
         // cout << 2 << "    " << node->value << endl;
         // cout << "check" << (node == node->left->parent.lock()) << endl;
@@ -585,7 +618,6 @@ shared_ptr<TreeNode> CnfTree::compact_tree(shared_ptr<TreeNode> node) {
                 // cout << 3 << "    " << node->value << endl;
             }
         }
-        return node;
     } else if (node->value == "|") {
         string left = get_prefix(node->left);
         string right = get_prefix(node->right);
@@ -604,7 +636,7 @@ shared_ptr<TreeNode> CnfTree::compact_tree(shared_ptr<TreeNode> node) {
                 for (int j = 0; j < rightString.size(); j++) {
                     string l = leftString[i];
                     string r = rightString[j];
-                    if (l != "|" && l != "&" && l == r) {
+                    if (l != "|" && l == r) {
                         if (i > 0 && leftString[i - 1] == "-" && (j == 0 || rightString[j - 1] != "-")) {
                             // node->Free();
                             node->value = "true";
@@ -623,6 +655,43 @@ shared_ptr<TreeNode> CnfTree::compact_tree(shared_ptr<TreeNode> node) {
                 if (to_break) {
                     break;
                 }
+            }
+            string negationLeft = ReplaceAll(left, "- ", "-");
+            string negationRight = ReplaceAll(right, "- ", "-");
+            vector<string> negationLeftString = split(negationLeft);
+            vector<string> negationRightString = split(negationRight);
+            negationLeftString.erase(unique(negationLeftString.begin(), negationLeftString.end()), negationLeftString.end());
+            negationRightString.erase(unique(negationRightString.begin(), negationRightString.end()), negationRightString.end());
+            sort(negationLeftString.begin(), negationLeftString.end());
+            sort(negationRightString.begin(), negationRightString.end());
+            negationLeft = "";
+            for (int i = 0; i < negationLeftString.size() - 3; i++) {
+                negationLeft += "| ";
+            }
+            for (auto str:negationLeftString) {
+                negationLeft += str + " ";
+            }
+            negationLeft = negationLeft.substr(0, negationLeft.length() - 1);
+            
+            negationRight = "";
+            for (int i = 0; i < negationRightString.size() - 3; i++) {
+                negationRight += "| ";
+            }
+            for (auto str:negationRightString) {
+                negationRight += str + " ";
+            }
+            negationRight = negationRight.substr(0, negationRight.length() - 1);
+            if (negationLeftString == negationRightString) {
+                node.reset();
+                node = make_sub_tree(ReplaceAll(negationLeft, "-", "- "));
+                while(!exp_stack.empty()) exp_stack.pop();
+            } else {
+                node->left.reset();
+                node->left = make_sub_tree(ReplaceAll(negationLeft, "-", "- "));
+                while(!exp_stack.empty()) exp_stack.pop();
+                node->right.reset();
+                node->right = make_sub_tree(ReplaceAll(negationRight, "-", "- "));
+                while(!exp_stack.empty()) exp_stack.pop();
             }
         }
     } else if (node->value == "&") {
@@ -643,7 +712,7 @@ shared_ptr<TreeNode> CnfTree::compact_tree(shared_ptr<TreeNode> node) {
                 for (int j = 0; j < rightString.size(); j++) {
                     string l = leftString[i];
                     string r = rightString[j];
-                    if (l != "|" && l != "&" && l == r) {
+                    if (l != "&" && l == r) {
                         // cout << 6 << endl;
                         if (i > 0 && leftString[i - 1] == "-" && (j == 0 || rightString[j - 1] != "-")) {
                             // node->Free();
@@ -664,8 +733,45 @@ shared_ptr<TreeNode> CnfTree::compact_tree(shared_ptr<TreeNode> node) {
                     break;
                 }
             }
+            string negationLeft = ReplaceAll(left, "- ", "-");
+            string negationRight = ReplaceAll(right, "- ", "-");
+            vector<string> negationLeftString = split(negationLeft);
+            vector<string> negationRightString = split(negationRight);
+            negationLeftString.erase(unique(negationLeftString.begin(), negationLeftString.end()), negationLeftString.end());
+            negationRightString.erase(unique(negationRightString.begin(), negationRightString.end()), negationRightString.end());
+            sort(negationLeftString.begin(), negationLeftString.end());
+            sort(negationRightString.begin(), negationRightString.end());
+            negationLeft = "";
+            for (int i = 0; i < negationLeftString.size() - 3; i++) {
+                negationLeft += "& ";
+            }
+            for (auto str:negationLeftString) {
+                negationLeft += str + " ";
+            }
+            negationLeft = negationLeft.substr(0, negationLeft.length() - 1);
+            
+            negationRight = "";
+            for (int i = 0; i < negationRightString.size() - 3; i++) {
+                negationRight += "& ";
+            }
+            for (auto str:negationRightString) {
+                negationRight += str + " ";
+            }
+            negationRight = negationRight.substr(0, negationRight.length() - 1);
+            if (negationLeftString == negationRightString) {
+                node = make_sub_tree(ReplaceAll(negationLeft, "-", "- "));
+                while(!exp_stack.empty()) exp_stack.pop();
+            } else {
+                node->left.reset();
+                node->left = make_sub_tree(ReplaceAll(negationLeft, "-", "- "));
+                while(!exp_stack.empty()) exp_stack.pop();
+                node->right.reset();
+                node->right = make_sub_tree(ReplaceAll(negationRight, "-", "- "));
+                while(!exp_stack.empty()) exp_stack.pop();
+            }
         }
     }
+    node->is_compact = true;
     return node;
 }
 
@@ -686,22 +792,26 @@ int main(int argc, char** argv) {
 
     tree->make_tree(str);
 
-    // cout << tree->get_prefix() << endl;
+    cout << tree->get_prefix() << endl;
     // cout << tree->get_infix() << endl;
+    getchar();
 
     tree->implFree();
 
-    // cout << tree->get_prefix() << endl;
+    cout << tree->get_prefix() << endl;
     // cout << tree->get_infix() << endl;
+    getchar();
 
     tree->NNF();
 
-    // cout << tree->get_prefix() << endl;
+    cout << tree->get_prefix() << endl;
     // cout << tree->get_infix() << endl;
+    getchar();
 
     tree->CNF();
 
     cout << tree->get_prefix() << endl;
+    getchar();
     cout << tree->get_infix() << endl;
 
     string minisat_form = tree->get_minisat_form();

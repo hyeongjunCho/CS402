@@ -17,7 +17,7 @@ class TreeNode
         int valueType; // 0: literal, 1: unary op, 2: binary op
         shared_ptr<TreeNode> left, right;
         weak_ptr<TreeNode> parent;
-        int num;
+        bool is_compact;
 };
 
 class CnfTree
@@ -39,7 +39,8 @@ class CnfTree
         void CNF();
     private:
         // stack<shared_ptr<TreeNode>*> op_stack; // Not stack of TreeNode list
-        stack<shared_ptr<TreeNode>> exp_stack;
+        stack<TreeNode*> exp_stack;
+        shared_ptr<TreeNode> make_sub_tree(const string expr);
         void check_parent(shared_ptr<TreeNode> node, int* count0, int* count1);
         void set_parent(shared_ptr<TreeNode> node);
         string get_prefix(shared_ptr<TreeNode> node);
