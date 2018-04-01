@@ -49,7 +49,7 @@ class CnfTree {
         shared_ptr<TreeNode> NNF(shared_ptr<TreeNode> node);
         shared_ptr<TreeNode> CNF(shared_ptr<TreeNode> node);
         shared_ptr<TreeNode> distr(shared_ptr<TreeNode> node1, shared_ptr<TreeNode> node2);
-        void compact_tree(shared_ptr<TreeNode> node);
+        void compact_tree(shared_ptr<TreeNode>& node);
         shared_ptr<TreeNode> root;
         vector<string> literals;
         int CNF_clauses;
