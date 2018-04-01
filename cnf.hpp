@@ -7,8 +7,7 @@
 
 using namespace std;
 
-class TreeNode
-{
+class TreeNode {
     public:
         TreeNode(const string val);
         ~TreeNode();
@@ -20,8 +19,7 @@ class TreeNode
         bool is_compact;
 };
 
-class CnfTree
-{
+class CnfTree {
     public:
         CnfTree();
         ~CnfTree();
@@ -39,7 +37,7 @@ class CnfTree
         void CNF();
     private:
         // stack<shared_ptr<TreeNode>*> op_stack; // Not stack of TreeNode list
-        stack<TreeNode*> exp_stack;
+        stack<shared_ptr<TreeNode>> exp_stack;
         shared_ptr<TreeNode> make_sub_tree(const string expr);
         void check_parent(shared_ptr<TreeNode> node, int* count0, int* count1);
         void set_parent(shared_ptr<TreeNode> node);
@@ -51,12 +49,13 @@ class CnfTree
         shared_ptr<TreeNode> NNF(shared_ptr<TreeNode> node);
         shared_ptr<TreeNode> CNF(shared_ptr<TreeNode> node);
         shared_ptr<TreeNode> distr(shared_ptr<TreeNode> node1, shared_ptr<TreeNode> node2);
-        shared_ptr<TreeNode> compact_tree(shared_ptr<TreeNode> node);
+        void compact_tree(shared_ptr<TreeNode> node);
         shared_ptr<TreeNode> root;
         vector<string> literals;
         int CNF_clauses;
 };
 
 int node_num = 0;
+void reset(shared_ptr<TreeNode>& node);
 
 #endif
